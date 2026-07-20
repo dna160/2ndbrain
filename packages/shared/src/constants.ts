@@ -7,14 +7,16 @@
  */
 
 // ── Queues (BullMQ) — docs/01 §5 ──────────────────────────────────────────────
+// Values are namespaced `recall-*` (Lynkbot convention) so they never collide on a
+// shared Redis. Keys stay the bare job kind; QueueName is the value union.
 export const QUEUES = {
-  media: 'media',
-  transcription: 'transcription',
-  structuring: 'structuring',
-  consolidation: 'consolidation',
-  digest: 'digest',
-  briefs: 'briefs',
-  calendarSync: 'calendarSync',
+  media: 'recall-media',
+  transcription: 'recall-transcription',
+  structuring: 'recall-structuring',
+  consolidation: 'recall-consolidation',
+  digest: 'recall-digest',
+  briefs: 'recall-briefs',
+  calendarSync: 'recall-calendar-sync',
 } as const;
 
 export const QUEUE_NAMES = Object.values(QUEUES);

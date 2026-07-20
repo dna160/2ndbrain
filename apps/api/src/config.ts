@@ -28,22 +28,24 @@ const ConfigSchema = z.object({
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_PUBLISHABLE_KEY: z.string().optional(),
 
-  // ── Object storage: Cloudflare R2 (Phase 2) ──────────────────────────────
-  R2_ACCOUNT_ID: z.string().optional(),
-  R2_ACCESS_KEY_ID: z.string().optional(),
-  R2_SECRET_ACCESS_KEY: z.string().optional(),
-  R2_BUCKET: z.string().optional(),
+  // ── Object storage: Cloudflare R2 (Phase 2, required) ────────────────────
+  R2_ACCOUNT_ID: z.string().min(1),
+  R2_ACCESS_KEY_ID: z.string().min(1),
+  R2_SECRET_ACCESS_KEY: z.string().min(1),
+  R2_BUCKET: z.string().min(1),
 
   // ── Model providers (Phase 3 / 6) ────────────────────────────────────────
   GROQ_API_KEY: z.string().optional(),
   DEEPSEEK_API_KEY: z.string().optional(),
   EMBEDDINGS_API_KEY: z.string().optional(),
 
-  // ── Lynkbot relay + WhatsApp send (Phase 2 / 5) ──────────────────────────
-  LYNKBOT_RELAY_SECRET: z.string().optional(),
-  LYNKBOT_INTERNAL_URL: z.string().url().optional(),
-  META_ACCESS_TOKEN: z.string().optional(),
-  META_PHONE_NUMBER_ID: z.string().optional(),
+  // ── Lynkbot relay + WhatsApp send ────────────────────────────────────────
+  LYNKBOT_RELAY_SECRET: z.string().min(16), // Phase 2, required (HMAC secret)
+  LYNKBOT_INTERNAL_URL: z.string().url().optional(), // Phase 5
+  META_ACCESS_TOKEN: z.string().min(1), // Phase 2, required (media fetch)
+  META_PHONE_NUMBER_ID: z.string().optional(), // Phase 5
+  /** Max relay clock skew for anti-replay (ms). */
+  RELAY_MAX_SKEW_MS: z.coerce.number().int().positive().default(300_000),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

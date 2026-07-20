@@ -21,5 +21,9 @@ export const relationTypeSchema = z.enum(RELATION_TYPES);
 export const pipelineStageSchema = z.enum(STAGES);
 export const jobTypeSchema = z.enum(JOB_TYPES);
 
+// ── Ingestion contracts ───────────────────────────────────────────────────────
+export * from './meta';
+
 // ── API contracts (per phase) ─────────────────────────────────────────────────
 export * from './api/settings';
+export * from './api/uploads';

@@ -10,9 +10,10 @@ import {
 import { entityKindSchema, relationTypeSchema } from './schemas/index';
 
 describe('shared vocabularies', () => {
-  it('exposes every declared queue as a name', () => {
+  it('exposes every declared queue as a namespaced name', () => {
     expect(QUEUE_NAMES).toEqual(Object.values(QUEUES));
-    expect(QUEUE_NAMES).toContain('transcription');
+    expect(QUEUES.transcription).toBe('recall-transcription');
+    expect(QUEUE_NAMES.every((n) => n.startsWith('recall-'))).toBe(true);
   });
 
   it('keeps the pipeline stage order authoritative', () => {

@@ -12,7 +12,7 @@ export default defineConfig({
       reportsDirectory: './coverage',
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'src/index.ts', 'src/worker.ts'],
-      // CLAUDE.md QC gate: 100% on the auth guard + pipeline service + cost metering.
+      // CLAUDE.md QC gate: 100% on auth guard, pipeline/cost, and ingestion idempotency.
       thresholds: {
         '**/services/pipeline.service.ts': {
           statements: 100,
@@ -20,7 +20,15 @@ export default defineConfig({
           functions: 100,
           lines: 100,
         },
+        '**/services/ingest.service.ts': {
+          statements: 100,
+          branches: 100,
+          functions: 100,
+          lines: 100,
+        },
+        '**/services/meta/extract.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/auth/authenticator.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+        '**/middleware/relayHmac.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/middleware/internalApiKey.ts': {
           statements: 100,
           branches: 100,

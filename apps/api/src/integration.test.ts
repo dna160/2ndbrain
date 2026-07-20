@@ -7,21 +7,27 @@
  * Skips automatically when no Docker daemon is reachable so `pnpm test` still runs elsewhere;
  * the coverage gate is met by the unit tests regardless.
  */
+import { createHmac } from 'node:crypto';
 import { existsSync } from 'node:fs';
 
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { buildApp } from './app';
 import { createAuthenticator } from './auth/authenticator';
 import { resolveTenantFromDb } from './auth/clerk';
 import { createDb, type DbHandle } from './db/client';
 import { runMigrations } from './db/migrate';
-import { pipelineRuns } from './db/schema';
+import { makeRelayHmacGuard } from './middleware/relayHmac';
+import { events, pipelineRuns } from './db/schema';
 import { seed } from './db/seed';
+import { IngestService } from './services/ingest.service';
 import { PipelineService } from './services/pipeline.service';
+
+const RELAY_SECRET = 'relay-secret-at-least-16';
+const RELAY_NOW = 1_700_000_000_000;
 
 const dockerAvailable =
   !!process.env.DOCKER_HOST ||
@@ -56,9 +62,65 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
       verify: async (t) => (t === 'good' ? { sub: 'user_seed_operator' } : null),
       resolveTenant: resolveTenantFromDb(handle.db),
     });
-    app = buildApp({ db: handle.db, authenticate, pingRedis: async () => true });
+    const enqueue = vi.fn(async () => undefined);
+    app = buildApp({
+      db: handle.db,
+      authenticate,
+      pingRedis: async () => true,
+      ingestion: {
+        ingest: new IngestService({
+          db: handle.db,
+          enqueuer: { enqueue },
+          pipeline: new PipelineService(handle.db),
+        }),
+        relayGuard: makeRelayHmacGuard({
+          secret: RELAY_SECRET,
+          maxSkewMs: 300_000,
+          now: () => RELAY_NOW,
+        }),
+        resolveTenantId: async () => tenantId,
+        r2: { presignPut: async () => 'https://r2.example/put' },
+        enqueuer: { enqueue },
+        pipeline: new PipelineService(handle.db),
+        internalApiKey: 'test-internal-key-123',
+      },
+    });
     await app.ready();
   });
+
+  function postRelay(body: unknown) {
+    const raw = JSON.stringify(body);
+    const signature = createHmac('sha256', RELAY_SECRET).update(`${RELAY_NOW}.${raw}`).digest('hex');
+    return app.inject({
+      method: 'POST',
+      url: '/ingest/wa',
+      headers: {
+        'content-type': 'application/json',
+        'x-relay-timestamp': String(RELAY_NOW),
+        'x-relay-signature': signature,
+      },
+      payload: raw,
+    });
+  }
+
+  function relayTextBody(waId: string, msgId: string) {
+    return {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: 'PN' },
+                messages: [
+                  { id: msgId, from: waId, type: 'text', timestamp: '1700000000', text: { body: 'hai' } },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+  }
 
   afterAll(async () => {
     await app?.close();
@@ -122,5 +184,54 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
     const contacts = await app.inject({ method: 'GET', url: '/v1/settings/contacts', headers: auth });
     const contactsBody = contacts.json<{ items: Array<{ label: string | null }> }>();
     expect(contactsBody.items.some((c) => c.label === 'Operator')).toBe(true);
+  });
+
+  // ── Phase 2 acceptance ──────────────────────────────────────────────────────
+  it('ingests a relayed message idempotently — replay yields no new rows', async () => {
+    const first = await postRelay(relayTextBody('628int', 'wamid.INT1'));
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({ persisted: 1, duplicates: 0 });
+
+    const second = await postRelay(relayTextBody('628int', 'wamid.INT1'));
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toMatchObject({ persisted: 0, duplicates: 1 });
+
+    const rows = await handle.db.select().from(events).where(eq(events.externalId, 'wamid.INT1'));
+    expect(rows).toHaveLength(1);
+  });
+
+  it('rejects an unsigned relay POST', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/ingest/wa',
+      headers: { 'content-type': 'application/json' },
+      payload: '{}',
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('drops blacklisted senders at ingest — zero event rows', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/settings/blacklist',
+      headers: { authorization: 'Bearer good' },
+      payload: { waId: '628blocked' },
+    });
+    const res = await postRelay(relayTextBody('628blocked', 'wamid.BLK1'));
+    expect(res.json()).toMatchObject({ dropped: 1, persisted: 0 });
+
+    const rows = await handle.db.select().from(events).where(eq(events.externalId, 'wamid.BLK1'));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('exposes the DLQ behind the internal API key', async () => {
+    const unauth = await app.inject({ method: 'GET', url: '/internal/dlq' });
+    expect(unauth.statusCode).toBe(401);
+    const ok = await app.inject({
+      method: 'GET',
+      url: '/internal/dlq',
+      headers: { 'x-internal-api-key': 'test-internal-key-123' },
+    });
+    expect(ok.statusCode).toBe(200);
   });
 });

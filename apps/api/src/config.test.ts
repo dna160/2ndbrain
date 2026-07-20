@@ -8,6 +8,12 @@ const validEnv = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/recall',
   REDIS_URL: 'redis://localhost:6379',
   CLERK_SECRET_KEY: 'sk_test_dummy',
+  R2_ACCOUNT_ID: 'acct',
+  R2_ACCESS_KEY_ID: 'key',
+  R2_SECRET_ACCESS_KEY: 'secret',
+  R2_BUCKET: 'recall-media',
+  LYNKBOT_RELAY_SECRET: 'relay-secret-at-least-16',
+  META_ACCESS_TOKEN: 'meta-token',
 } satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {
