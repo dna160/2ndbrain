@@ -9,12 +9,19 @@ import { createAuthenticator } from './auth/authenticator';
 import { clerkVerify, resolveTenantFromDb } from './auth/clerk';
 import { loadConfig } from './config';
 import { createDb } from './db/client';
-import { tenants } from './db/schema';
+import { tenants, users } from './db/schema';
 import { makeRelayHmacGuard } from './middleware/relayHmac';
 import { BullEnqueuer, createQueueStats, createRedisConnection } from './queues';
+import { CalendarService } from './services/calendar.service';
+import { ConversationsService } from './services/conversations.service';
+import { GoogleApiCalendarClient } from './services/google/calendar.client';
+import { googleTokenProvider } from './services/google/token';
 import { IngestService } from './services/ingest.service';
+import { LynkbotTakeoverClient } from './services/lynkbot.client';
+import { GraphMetaSendClient } from './services/meta/send.client';
 import { PipelineService } from './services/pipeline.service';
 import { S3R2Client } from './services/r2.service';
+import { WaSendService } from './services/waSend.service';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -48,6 +55,32 @@ async function main(): Promise<void> {
     resolveTenant: resolveTenantFromDb(db),
   });
 
+  // ── Phase 5: waSend + conversations + calendar ──────────────────────────────
+  const resolveOwnerClerkUserId = async (): Promise<string | null> => {
+    const rows = await db
+      .select({ clerkUserId: users.clerkUserId })
+      .from(users)
+      .orderBy(asc(users.createdAt))
+      .limit(1);
+    return rows[0]?.clerkUserId ?? null;
+  };
+  const waSend = new WaSendService({
+    db,
+    meta: new GraphMetaSendClient(config.META_ACCESS_TOKEN, config.META_PHONE_NUMBER_ID),
+    templateName: config.WA_UTILITY_TEMPLATE,
+  });
+  const conversations = new ConversationsService({
+    db,
+    waSend,
+    takeover: new LynkbotTakeoverClient(config.LYNKBOT_INTERNAL_URL, config.INTERNAL_API_KEY),
+  });
+  const calendar = new CalendarService({
+    db,
+    client: new GoogleApiCalendarClient(
+      googleTokenProvider(config.CLERK_SECRET_KEY, resolveOwnerClerkUserId),
+    ),
+  });
+
   const app = buildApp({
     db,
     authenticate,
@@ -63,6 +96,7 @@ async function main(): Promise<void> {
       queueStats: createQueueStats(connection),
       internalApiKey: config.INTERNAL_API_KEY,
     },
+    calendarConversations: { calendar, conversations },
   });
 
   try {

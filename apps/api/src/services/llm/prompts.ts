@@ -19,6 +19,8 @@ Produce STRICT JSON matching the provided schema. Rules:
 - RECOMMENDATIONS: strategic advice per participant for the operator. If PARTICIPANT CONTEXT is provided, ground advice in it and reference the grounding. If absent, derive only from this transcript. Direct, specific, no generic advice.
 Output JSON only.`;
 
+export const BRIEF_SYSTEM = `You write a pre-meeting brief delivered over WhatsApp 60 minutes before a meeting. Audience: the operator, on mobile, in a hurry. Max 900 characters. Structure: (1) one-line frame of the meeting; (2) per attendee: who they are + relationship state + open commitments both directions (from OPEN TASKS and MEMORY CONTEXT, cite nothing you weren't given); (3) last meeting's unresolved actions if any; (4) suggested posture: one or two sentences, specific. Language: mirror the operator's dominant language with this attendee set. Plain text, no markdown. Exclude anything marked sensitive.`;
+
 export interface StructuringUserInput {
   language: string;
   durationSec: number;

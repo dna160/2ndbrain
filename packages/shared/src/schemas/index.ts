@@ -27,6 +27,10 @@ export * from './meta';
 // ── Meeting Note contracts ────────────────────────────────────────────────────
 export * from './meeting';
 
+// ── Calendar + Conversations contracts ────────────────────────────────────────
+export * from './calendar';
+export * from './conversations';
+
 // ── API contracts (per phase) ─────────────────────────────────────────────────
 export * from './api/settings';
 export * from './api/uploads';

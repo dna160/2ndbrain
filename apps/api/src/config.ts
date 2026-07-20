@@ -43,9 +43,11 @@ const ConfigSchema = z.object({
 
   // ── Lynkbot relay + WhatsApp send ────────────────────────────────────────
   LYNKBOT_RELAY_SECRET: z.string().min(16), // Phase 2, required (HMAC secret)
-  LYNKBOT_INTERNAL_URL: z.string().url().optional(), // Phase 5
+  LYNKBOT_INTERNAL_URL: z.string().url(), // Phase 5, required (takeover proxy)
   META_ACCESS_TOKEN: z.string().min(1), // Phase 2, required (media fetch)
-  META_PHONE_NUMBER_ID: z.string().optional(), // Phase 5
+  META_PHONE_NUMBER_ID: z.string().min(1), // Phase 5, required (outbound send)
+  /** Approved utility template name for out-of-window sends (docs/00 F5). */
+  WA_UTILITY_TEMPLATE: z.string().default('daily_brief_ready'),
   /** Max relay clock skew for anti-replay (ms). */
   RELAY_MAX_SKEW_MS: z.coerce.number().int().positive().default(300_000),
 });

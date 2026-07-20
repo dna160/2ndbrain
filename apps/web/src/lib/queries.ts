@@ -2,21 +2,26 @@
 /** TanStack Query hooks — the dashboard's read/write data layer over the typed API client. */
 import {
   confirmParticipantRequestSchema,
+  conversationMessageSchema,
   eventListItemSchema,
   listOf,
   meetingDetailSchema,
   meetingListItemSchema,
   pipelineRunListItemSchema,
   queueDepthSchema,
+  sendReplyResponseSchema,
   taskListItemSchema,
   taskPatchSchema,
+  threadSchema,
+  upcomingResponseSchema,
   type ConfirmParticipantRequest,
+  type ConversationFilter,
 } from '@recall/shared';
 import { useAuth } from '@clerk/nextjs';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { apiFetch } from './api';
+import { API_URL, apiFetch } from './api';
 
 function useToken() {
   const { getToken } = useAuth();
@@ -122,5 +127,75 @@ export function useRetryRun() {
         token: await getToken(),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pipeline', 'runs'] }),
+  });
+}
+
+// ── Calendar / Upcoming ─────────────────────────────────────────────────────
+export function useUpcoming() {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['upcoming'],
+    queryFn: async () => apiFetch('/v1/calendar/upcoming', upcomingResponseSchema, { token: await getToken() }),
+  });
+}
+
+export function useResolveDraft() {
+  const getToken = useToken();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, decision }: { id: string; decision: 'confirm' | 'reject' }) =>
+      apiFetch(`/v1/calendar/drafts/${id}/${decision}`, z.record(z.unknown()), {
+        method: 'POST',
+        token: await getToken(),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['upcoming'] }),
+  });
+}
+
+// ── Conversations ───────────────────────────────────────────────────────────
+export function useThreads(filter: ConversationFilter) {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['threads', filter],
+    queryFn: async () =>
+      (await apiFetch(`/v1/conversations?filter=${filter}`, listOf(threadSchema), { token: await getToken() }))
+        .items,
+  });
+}
+
+export function useThreadMessages(waId: string) {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['thread', waId],
+    queryFn: async () =>
+      (
+        await apiFetch(`/v1/conversations/${waId}/messages`, listOf(conversationMessageSchema), {
+          token: await getToken(),
+        })
+      ).items,
+  });
+}
+
+export type SendReplyOutcome = { needsConfirm: true } | { needsConfirm: false; delivery: string };
+
+export function useSendReply(waId: string) {
+  const getToken = useToken();
+  const qc = useQueryClient();
+  return useMutation<SendReplyOutcome, Error, { text: string; takeover?: boolean }>({
+    mutationFn: async ({ text, takeover }) => {
+      const res = await fetch(
+        `${API_URL}/v1/conversations/${waId}/messages?takeover=${takeover ? 'true' : 'false'}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${await getToken()}` },
+          body: JSON.stringify({ text }),
+        },
+      );
+      if (res.status === 409) return { needsConfirm: true };
+      if (!res.ok) throw new Error(`send failed: ${res.status}`);
+      const parsed = sendReplyResponseSchema.parse(await res.json());
+      return { needsConfirm: false, delivery: parsed.delivery };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['thread', waId] }),
   });
 }

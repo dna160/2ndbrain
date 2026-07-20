@@ -11,13 +11,15 @@ import type { Job } from 'bullmq';
 import type { Database } from '../db/client';
 import { dlq } from '../db/schema';
 
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+
 export function onFailedToDlq(db: Database, queue: string) {
-  return async (job: Job<{ tenantId: string }> | undefined, err: Error): Promise<void> => {
+  return async (job: Job<{ tenantId?: string }> | undefined, err: Error): Promise<void> => {
     if (!job) return;
     const maxAttempts = job.opts.attempts ?? 1;
     if (job.attemptsMade >= maxAttempts) {
       await db.insert(dlq).values({
-        tenantId: job.data.tenantId,
+        tenantId: job.data.tenantId ?? NIL_UUID, // scheduled jobs carry no tenant
         queue,
         jobId: job.id ?? null,
         payload: job.data as unknown as Record<string, unknown>,

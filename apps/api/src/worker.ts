@@ -1,26 +1,35 @@
 /**
- * Worker bootstrap (MODE=worker) — same image as the api (docs/01 §1). Registers BullMQ
- * consumers: media (Phase 2), transcription + structuring (Phase 3).
+ * Worker bootstrap (MODE=worker) — same image as the api (docs/01 §1). BullMQ consumers:
+ * media (P2), transcription + structuring (P3), calendar sync + briefs (P5, repeatable).
  */
+import { asc, eq } from 'drizzle-orm';
 import type { Worker } from 'bullmq';
 
 import { loadConfig } from './config';
 import { createDb } from './db/client';
+import { users, waContacts } from './db/schema';
 import { BullEnqueuer, createRedisConnection } from './queues';
+import { BriefsService } from './services/briefs.service';
+import { CalendarService } from './services/calendar.service';
+import { GoogleApiCalendarClient } from './services/google/calendar.client';
+import { googleTokenProvider } from './services/google/token';
 import { DeepSeekClient } from './services/llm/deepseek';
 import { MediaService } from './services/media.service';
 import { GraphMetaMediaClient } from './services/meta/media.client';
+import { GraphMetaSendClient } from './services/meta/send.client';
 import { PipelineService } from './services/pipeline.service';
 import { S3R2Client } from './services/r2.service';
 import { StructuringService } from './services/structuring.service';
 import { getDiarizationProvider } from './services/stt/diarization.provider';
 import { GroqWhisperProvider } from './services/stt/groqWhisper';
 import { TranscriptionService } from './services/transcription.service';
+import { WaSendService } from './services/waSend.service';
 import { createMediaWorker } from './workers/media.worker';
+import { createScheduledWorkers } from './workers/scheduled.worker';
 import { createStructuringWorker } from './workers/structuring.worker';
 import { createTranscriptionWorker } from './workers/transcription.worker';
 
-function main(): void {
+async function main(): Promise<void> {
   const config = loadConfig();
   if (config.MODE !== 'worker') {
     console.warn(`[worker] started with MODE=${config.MODE}; expected 'worker'.`);
@@ -51,18 +60,40 @@ function main(): void {
     diarizationMode: config.DIARIZATION,
     pipeline,
   });
-  const structuring = new StructuringService({
+  const structuring = new StructuringService({ db, llm: new DeepSeekClient(config.DEEPSEEK_API_KEY), pipeline });
+
+  const calendar = new CalendarService({
+    db,
+    client: new GoogleApiCalendarClient(
+      googleTokenProvider(config.CLERK_SECRET_KEY, async () => {
+        const [u] = await db.select({ clerkUserId: users.clerkUserId }).from(users).orderBy(asc(users.createdAt)).limit(1);
+        return u?.clerkUserId ?? null;
+      }),
+    ),
+  });
+  const [operator] = await db
+    .select({ waId: waContacts.waId })
+    .from(waContacts)
+    .where(eq(waContacts.label, 'Operator'))
+    .limit(1);
+  const briefs = new BriefsService({
     db,
     llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
-    pipeline,
+    waSend: new WaSendService({
+      db,
+      meta: new GraphMetaSendClient(config.META_ACCESS_TOKEN, config.META_PHONE_NUMBER_ID),
+      templateName: config.WA_UTILITY_TEMPLATE,
+    }),
+    operatorWaId: operator?.waId ?? '',
   });
 
   const workers: Worker[] = [
     createMediaWorker({ connection, db, media }),
     createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
     createStructuringWorker({ connection, db, structuring, pipeline }),
+    ...(await createScheduledWorkers({ connection, db, calendar, briefs })),
   ];
-  console.log('[worker] booted — media, transcription, structuring consuming.');
+  console.log('[worker] booted — media, transcription, structuring, calendar-sync, briefs.');
 
   const shutdown = (signal: string): void => {
     console.log(`[worker] received ${signal}, shutting down.`);
@@ -77,9 +108,7 @@ function main(): void {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-try {
-  main();
-} catch (err: unknown) {
+main().catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
-}
+});

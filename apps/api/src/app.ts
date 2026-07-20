@@ -12,6 +12,8 @@ import type { RelayGuard } from './middleware/relayHmac';
 import { registerIngestRoutes } from './routes/ingest/wa';
 import { registerDlqRoutes } from './routes/internal/dlq';
 import { registerHealthRoutes } from './routes/internal/health';
+import { registerCalendarRoutes } from './routes/v1/calendar';
+import { registerConversationRoutes } from './routes/v1/conversations';
 import { registerEventRoutes } from './routes/v1/events';
 import { registerMeetingRoutes } from './routes/v1/meetings';
 import { registerPipelineRoutes } from './routes/v1/pipeline';
@@ -19,6 +21,8 @@ import { registerSettingsRoutes } from './routes/v1/settings';
 import { registerTaskRoutes } from './routes/v1/tasks';
 import { registerUploadRoutes } from './routes/v1/uploads';
 import type { Enqueuer, QueueStats } from './queues';
+import type { CalendarService } from './services/calendar.service';
+import type { ConversationsService } from './services/conversations.service';
 import type { IngestService } from './services/ingest.service';
 import type { PipelineService } from './services/pipeline.service';
 import type { R2Client } from './services/r2.service';
@@ -43,6 +47,7 @@ export interface BuildAppDeps {
   pingDb?: () => Promise<boolean>;
   logger?: boolean;
   ingestion?: IngestionDeps;
+  calendarConversations?: { calendar: CalendarService; conversations: ConversationsService };
 }
 
 export function buildApp(deps: BuildAppDeps): FastifyInstance {
@@ -91,6 +96,15 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       registerMeetingRoutes(scoped, { db: deps.db, speaker: new SpeakerService({ db: deps.db }) });
       registerEventRoutes(scoped, deps.db);
       registerTaskRoutes(scoped, deps.db);
+      if (deps.calendarConversations) {
+        registerCalendarRoutes(scoped, {
+          db: deps.db,
+          calendar: deps.calendarConversations.calendar,
+        });
+        registerConversationRoutes(scoped, {
+          conversations: deps.calendarConversations.conversations,
+        });
+      }
       if (deps.ingestion) {
         registerUploadRoutes(scoped, {
           db: deps.db,

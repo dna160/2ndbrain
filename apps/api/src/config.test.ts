@@ -16,6 +16,8 @@ const validEnv = {
   META_ACCESS_TOKEN: 'meta-token',
   GROQ_API_KEY: 'groq-key',
   DEEPSEEK_API_KEY: 'deepseek-key',
+  LYNKBOT_INTERNAL_URL: 'http://lynkbot.internal',
+  META_PHONE_NUMBER_ID: 'pn-1',
 } satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {

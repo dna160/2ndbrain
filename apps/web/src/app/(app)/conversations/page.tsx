@@ -1,5 +1,7 @@
-import { Placeholder } from '../../../components/shell/Placeholder';
-
-export default function ConversationsPage() {
-  return <Placeholder title="Conversations" />;
+export default function ConversationsIndexPage() {
+  return (
+    <section className="pane detail">
+      <div className="empty">Select a conversation.</div>
+    </section>
+  );
 }
