@@ -13,6 +13,7 @@ import type { Database } from '../db/client';
 import { connectedAccounts, tenants } from '../db/schema';
 import type { BriefsService } from '../services/briefs.service';
 import type { CalendarService } from '../services/calendar.service';
+import type { AlertsService } from '../services/alerts.service';
 import type { DigestService } from '../services/digest.service';
 import type { ConsolidationService } from '../services/memory/consolidation.service';
 import { onFailedToDlq } from './dlq';
@@ -24,6 +25,7 @@ export interface ScheduledDeps {
   briefs: BriefsService;
   consolidation: ConsolidationService;
   digest: DigestService;
+  alerts: AlertsService;
 }
 
 export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worker[]> {
@@ -54,7 +56,10 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
     QUEUES.briefs,
     async () => {
       const rows = await deps.db.select({ id: tenants.id }).from(tenants);
-      for (const t of rows) await deps.briefs.scan(t.id);
+      for (const t of rows) {
+        await deps.briefs.scan(t.id);
+        await deps.alerts.checkDlq(t.id); // DLQ depth > 0 → WA alert (docs/03 Phase 8)
+      }
     },
     { connection: deps.connection },
   );

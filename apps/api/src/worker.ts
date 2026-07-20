@@ -13,6 +13,7 @@ import { BriefsService } from './services/briefs.service';
 import { CalendarService } from './services/calendar.service';
 import { GoogleApiCalendarClient } from './services/google/calendar.client';
 import { googleTokenProvider } from './services/google/token';
+import { AlertsService } from './services/alerts.service';
 import { DigestService } from './services/digest.service';
 import { DeepSeekClient } from './services/llm/deepseek';
 import { MediaService } from './services/media.service';
@@ -121,12 +122,21 @@ async function main(): Promise<void> {
     calendar,
     operatorWaId: operator?.waId ?? '',
   });
+  const alerts = new AlertsService({
+    db,
+    waSend: new WaSendService({
+      db,
+      meta: new GraphMetaSendClient(config.META_ACCESS_TOKEN, config.META_PHONE_NUMBER_ID),
+      templateName: config.WA_UTILITY_TEMPLATE,
+    }),
+    operatorWaId: operator?.waId ?? '',
+  });
 
   const workers: Worker[] = [
     createMediaWorker({ connection, db, media }),
     createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
     createStructuringWorker({ connection, db, structuring, pipeline }),
-    ...(await createScheduledWorkers({ connection, db, calendar, briefs, consolidation, digest })),
+    ...(await createScheduledWorkers({ connection, db, calendar, briefs, consolidation, digest, alerts })),
   ];
   console.log('[worker] booted — media, transcription, structuring, calendar-sync, briefs.');
 
