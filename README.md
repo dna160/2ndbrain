@@ -45,3 +45,4 @@ Copy `.env.example` → `.env` before running. Config is validated fail-fast in
 ## Status
 
 **Phase 0 — Scaffold & CI.** See `docs/progress/` for the running build log.
+# 2ndbrain
