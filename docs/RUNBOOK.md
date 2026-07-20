@@ -1,7 +1,9 @@
 # Recall — Deploy & Operations Runbook
 
 Production target: **Railway** (3 services from one repo) + Postgres (pgvector) + Redis add-ons +
-Cloudflare R2. See `infra/railway.json` and `infra/Dockerfile.{api,web}`.
+Cloudflare R2. **Setup: `docs/RAILWAY.md`** (per-service configs `infra/railway.{api,worker,web}.json`
++ `infra/Dockerfile.{api,web}`). Note: Postgres **must** be pgvector-enabled (migration 0000 creates
+the `vector` extension) — Railway's default Postgres won't work.
 
 ## Services
 

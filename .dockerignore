@@ -1,0 +1,19 @@
+# Keep the Docker build context small on Railway (only source + manifests are COPYed).
+node_modules
+**/node_modules
+.git
+.github
+.turbo
+**/.next
+**/dist
+**/coverage
+**/playwright-report
+**/test-results
+*.tsbuildinfo
+.env
+.env.*
+docs/_package
+docs/_reference
+**/*.test.ts
+**/*.test.tsx
+**/e2e

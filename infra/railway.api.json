@@ -1,0 +1,14 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "infra/Dockerfile.api"
+  },
+  "deploy": {
+    "startCommand": "pnpm --filter @recall/api start",
+    "healthcheckPath": "/internal/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "numReplicas": 1
+  }
+}
