@@ -12,10 +12,13 @@ import type { RelayGuard } from './middleware/relayHmac';
 import { registerIngestRoutes } from './routes/ingest/wa';
 import { registerDlqRoutes } from './routes/internal/dlq';
 import { registerHealthRoutes } from './routes/internal/health';
+import { registerEventRoutes } from './routes/v1/events';
 import { registerMeetingRoutes } from './routes/v1/meetings';
+import { registerPipelineRoutes } from './routes/v1/pipeline';
 import { registerSettingsRoutes } from './routes/v1/settings';
+import { registerTaskRoutes } from './routes/v1/tasks';
 import { registerUploadRoutes } from './routes/v1/uploads';
-import type { Enqueuer } from './queues';
+import type { Enqueuer, QueueStats } from './queues';
 import type { IngestService } from './services/ingest.service';
 import type { PipelineService } from './services/pipeline.service';
 import type { R2Client } from './services/r2.service';
@@ -29,6 +32,7 @@ export interface IngestionDeps {
   r2: Pick<R2Client, 'presignPut'>;
   enqueuer: Pick<Enqueuer, 'enqueue'>;
   pipeline: PipelineService;
+  queueStats: QueueStats;
   internalApiKey: string;
 }
 
@@ -85,12 +89,19 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       scoped.addHook('preHandler', requireAuth);
       registerSettingsRoutes(scoped, deps.db);
       registerMeetingRoutes(scoped, { db: deps.db, speaker: new SpeakerService({ db: deps.db }) });
+      registerEventRoutes(scoped, deps.db);
+      registerTaskRoutes(scoped, deps.db);
       if (deps.ingestion) {
         registerUploadRoutes(scoped, {
           db: deps.db,
           r2: deps.ingestion.r2,
           enqueuer: deps.ingestion.enqueuer,
           pipeline: deps.ingestion.pipeline,
+        });
+        registerPipelineRoutes(scoped, {
+          db: deps.db,
+          queueStats: deps.ingestion.queueStats,
+          enqueuer: deps.ingestion.enqueuer,
         });
       }
     },

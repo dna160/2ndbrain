@@ -95,6 +95,7 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
         r2: { presignPut: async () => 'https://r2.example/put' },
         enqueuer: { enqueue },
         pipeline: new PipelineService(handle.db),
+        queueStats: { depths: async () => [] },
         internalApiKey: 'test-internal-key-123',
       },
     });

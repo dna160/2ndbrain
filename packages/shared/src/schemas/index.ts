@@ -30,3 +30,4 @@ export * from './meeting';
 // ── API contracts (per phase) ─────────────────────────────────────────────────
 export * from './api/settings';
 export * from './api/uploads';
+export * from './api/lists';

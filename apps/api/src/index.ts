@@ -11,7 +11,7 @@ import { loadConfig } from './config';
 import { createDb } from './db/client';
 import { tenants } from './db/schema';
 import { makeRelayHmacGuard } from './middleware/relayHmac';
-import { BullEnqueuer, createRedisConnection } from './queues';
+import { BullEnqueuer, createQueueStats, createRedisConnection } from './queues';
 import { IngestService } from './services/ingest.service';
 import { PipelineService } from './services/pipeline.service';
 import { S3R2Client } from './services/r2.service';
@@ -60,6 +60,7 @@ async function main(): Promise<void> {
       r2,
       enqueuer,
       pipeline,
+      queueStats: createQueueStats(connection),
       internalApiKey: config.INTERNAL_API_KEY,
     },
   });

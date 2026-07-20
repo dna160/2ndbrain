@@ -7,7 +7,8 @@
  *           enqueue without depending on BullMQ, so ingestion is unit-testable with a fake.
  * Exports : createRedisConnection(), Enqueuer, BullEnqueuer
  */
-import type { QueueName } from '@recall/shared';
+import type { QueueDepth, QueueName } from '@recall/shared';
+import { QUEUE_NAMES } from '@recall/shared/constants';
 import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 
@@ -63,4 +64,25 @@ export class BullEnqueuer implements Enqueuer {
     await Promise.all([...this.queues.values()].map((q) => q.close()));
     this.queues.clear();
   }
+}
+
+export interface QueueStats {
+  depths(): Promise<QueueDepth[]>;
+}
+
+/** Live per-queue depth for the Pipeline view header (docs/02 §5 Pipeline). */
+export function createQueueStats(connection: Redis): QueueStats {
+  const queues = QUEUE_NAMES.map((name) => new Queue(name, { connection }));
+  return {
+    async depths() {
+      return Promise.all(
+        queues.map(async (q) => ({
+          queue: q.name,
+          waiting: await q.getWaitingCount(),
+          active: await q.getActiveCount(),
+          failed: await q.getFailedCount(),
+        })),
+      );
+    },
+  };
 }

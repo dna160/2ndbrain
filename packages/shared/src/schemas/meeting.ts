@@ -63,6 +63,14 @@ export const meetingParticipantSchema = z.object({
   confidence: z.number(),
 });
 
+export const transcriptSegmentSchema = z.object({
+  startMs: z.number().int().nonnegative(),
+  endMs: z.number().int().nonnegative(),
+  speakerKey: z.string(),
+  text: z.string(),
+});
+export type TranscriptSegmentDto = z.infer<typeof transcriptSegmentSchema>;
+
 export const meetingDetailSchema = meetingListItemSchema.extend({
   transcriptId: z.string().uuid(),
   participants: z.array(meetingParticipantSchema),
@@ -73,6 +81,7 @@ export const meetingDetailSchema = meetingListItemSchema.extend({
   recommendations: z.array(
     z.object({ speakerKey: z.string(), entityId: z.string().uuid().nullable(), advice: z.string() }),
   ),
+  segments: z.array(transcriptSegmentSchema),
 });
 export type MeetingDetail = z.infer<typeof meetingDetailSchema>;
 

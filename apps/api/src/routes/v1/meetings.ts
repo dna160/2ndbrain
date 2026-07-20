@@ -15,7 +15,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
 import type { Database } from '../../db/client';
-import { meetings } from '../../db/schema';
+import { meetings, transcripts, type TranscriptSegment } from '../../db/schema';
 import type { SpeakerService } from '../../services/speaker.service';
 
 export interface MeetingRouteDeps {
@@ -25,7 +25,7 @@ export interface MeetingRouteDeps {
 
 type MeetingRow = typeof meetings.$inferSelect;
 
-function toDetail(m: MeetingRow): MeetingDetail {
+function toDetail(m: MeetingRow, segments: TranscriptSegment[]): MeetingDetail {
   return {
     id: m.id,
     title: m.title,
@@ -49,6 +49,12 @@ function toDetail(m: MeetingRow): MeetingDetail {
       speakerKey: r.speakerKey,
       entityId: r.entityId ?? null,
       advice: r.advice,
+    })),
+    segments: segments.map((s) => ({
+      startMs: s.startMs,
+      endMs: s.endMs,
+      speakerKey: s.speakerKey,
+      text: s.text,
     })),
   };
 }
@@ -83,7 +89,11 @@ export function registerMeetingRoutes(app: FastifyInstance, deps: MeetingRouteDe
       .from(meetings)
       .where(and(eq(meetings.tenantId, tenantId), eq(meetings.id, id)));
     if (!m) return reply.code(404).send({ error: 'meeting not found' });
-    return meetingDetailSchema.parse(toDetail(m));
+    const [t] = await deps.db
+      .select({ segments: transcripts.segments })
+      .from(transcripts)
+      .where(eq(transcripts.id, m.transcriptId));
+    return meetingDetailSchema.parse(toDetail(m, t?.segments ?? []));
   });
 
   app.post('/meetings/:id/participants/:speakerKey/confirm', async (request, reply) => {

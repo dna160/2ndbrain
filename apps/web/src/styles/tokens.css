@@ -1,0 +1,54 @@
+/* Design tokens — docs/02 §2. Law for apps/web. */
+:root {
+  /* color — neutral ink ramp + single functional accent */
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f4f4f3;
+  --border: #e4e4e2;
+  --ink: #1a1a18;
+  --ink-2: #5c5c58;
+  --ink-3: #8f8f8a;
+  --accent: #1f5fbf;
+  --accent-weak: #e8f0fc;
+  --ok: #1e7f4f;
+  --warn: #b0730f;
+  --err: #b3372e;
+  --sensitive: #7a4fbf;
+
+  /* type */
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-data: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --leading: 1.45;
+
+  /* space — 4px grid */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  /* shape & motion */
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  --t-fast: 120ms ease;
+  --t-med: 200ms ease;
+}
+
+[data-theme='dark'] {
+  --bg: #111110;
+  --surface: #1a1a19;
+  --surface-2: #232322;
+  --border: #2e2e2c;
+  --ink: #ededea;
+  --ink-2: #a5a5a0;
+  --ink-3: #6e6e69;
+  --accent: #6fa3f0;
+  --accent-weak: #1b2a44;
+}
