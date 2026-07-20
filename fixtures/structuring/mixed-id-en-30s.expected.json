@@ -1,0 +1,31 @@
+{
+  "topics": [
+    {
+      "title": "Supplier baru Genchai",
+      "startMs": 0,
+      "endMs": 14000,
+      "subnotes": ["Bahas supplier baru untuk Genchai", "Lock pricing sebelum Jumat depan"]
+    },
+    {
+      "title": "MOQ & payment terms",
+      "startMs": 14000,
+      "endMs": 30000,
+      "subnotes": ["Follow up ke Budi soal MOQ", "Decide payment terms next week"]
+    }
+  ],
+  "summary": "Membahas onboarding supplier baru untuk Genchai: mengunci harga sebelum Jumat depan, menindaklanjuti MOQ dengan Budi, dan memutuskan payment terms minggu depan.",
+  "decisions": ["Lock supplier pricing before next Friday"],
+  "actions": [
+    { "title": "Follow up with Budi on MOQ", "owner": "S1", "deadline": null },
+    { "title": "Decide payment terms", "owner": null, "deadline": null }
+  ],
+  "openQuestions": ["What payment terms are acceptable?"],
+  "speakers": [
+    { "speakerKey": "S1", "suggestedName": null, "confidence": 0.4, "evidence": null },
+    { "speakerKey": "S2", "suggestedName": null, "confidence": 0.4, "evidence": null }
+  ],
+  "attributionConfidence": 0.55,
+  "recommendations": [
+    { "speakerKey": "S1", "advice": "Push Budi for a firm MOQ number before committing to pricing." }
+  ]
+}

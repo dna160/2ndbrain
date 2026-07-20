@@ -27,6 +27,7 @@ export default defineConfig({
           lines: 100,
         },
         '**/services/meta/extract.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+        '**/services/llm/parse.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/auth/authenticator.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/middleware/relayHmac.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/middleware/internalApiKey.ts': {

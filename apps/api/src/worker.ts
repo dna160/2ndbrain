@@ -1,15 +1,24 @@
 /**
  * Worker bootstrap (MODE=worker) — same image as the api (docs/01 §1). Registers BullMQ
- * consumers. Phase 2 wires the media worker; transcription/structuring/etc. land in later phases.
+ * consumers: media (Phase 2), transcription + structuring (Phase 3).
  */
+import type { Worker } from 'bullmq';
+
 import { loadConfig } from './config';
 import { createDb } from './db/client';
 import { BullEnqueuer, createRedisConnection } from './queues';
+import { DeepSeekClient } from './services/llm/deepseek';
 import { MediaService } from './services/media.service';
 import { GraphMetaMediaClient } from './services/meta/media.client';
 import { PipelineService } from './services/pipeline.service';
 import { S3R2Client } from './services/r2.service';
+import { StructuringService } from './services/structuring.service';
+import { getDiarizationProvider } from './services/stt/diarization.provider';
+import { GroqWhisperProvider } from './services/stt/groqWhisper';
+import { TranscriptionService } from './services/transcription.service';
 import { createMediaWorker } from './workers/media.worker';
+import { createStructuringWorker } from './workers/structuring.worker';
+import { createTranscriptionWorker } from './workers/transcription.worker';
 
 function main(): void {
   const config = loadConfig();
@@ -27,16 +36,38 @@ function main(): void {
     secretAccessKey: config.R2_SECRET_ACCESS_KEY,
     bucket: config.R2_BUCKET,
   });
-  const meta = new GraphMetaMediaClient(config.META_ACCESS_TOKEN);
-  const media = new MediaService({ db, r2, meta, enqueuer, pipeline });
 
-  const mediaWorker = createMediaWorker({ connection, db, media });
-  console.log('[worker] booted — media worker consuming.');
+  const media = new MediaService({
+    db,
+    r2,
+    meta: new GraphMetaMediaClient(config.META_ACCESS_TOKEN),
+    enqueuer,
+    pipeline,
+  });
+  const transcription = new TranscriptionService({
+    db,
+    stt: new GroqWhisperProvider(config.GROQ_API_KEY),
+    diarization: getDiarizationProvider(config.DIARIZATION),
+    diarizationMode: config.DIARIZATION,
+    pipeline,
+  });
+  const structuring = new StructuringService({
+    db,
+    llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
+    pipeline,
+  });
+
+  const workers: Worker[] = [
+    createMediaWorker({ connection, db, media }),
+    createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
+    createStructuringWorker({ connection, db, structuring, pipeline }),
+  ];
+  console.log('[worker] booted — media, transcription, structuring consuming.');
 
   const shutdown = (signal: string): void => {
     console.log(`[worker] received ${signal}, shutting down.`);
     void (async () => {
-      await mediaWorker.close();
+      await Promise.all(workers.map((w) => w.close()));
       await enqueuer.close();
       await connection.quit();
       process.exit(0);

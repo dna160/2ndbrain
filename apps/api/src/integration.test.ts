@@ -8,8 +8,9 @@
  * the coverage gate is met by the unit tests regardless.
  */
 import { createHmac } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
+import type { StructuringOutput } from '@recall/shared';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
@@ -21,13 +22,25 @@ import { resolveTenantFromDb } from './auth/clerk';
 import { createDb, type DbHandle } from './db/client';
 import { runMigrations } from './db/migrate';
 import { makeRelayHmacGuard } from './middleware/relayHmac';
-import { events, pipelineRuns } from './db/schema';
+import { events, meetings, pipelineRuns, tasks } from './db/schema';
 import { seed } from './db/seed';
 import { IngestService } from './services/ingest.service';
+import type { LlmClient } from './services/llm/types';
 import { PipelineService } from './services/pipeline.service';
+import { NoopDiarization } from './services/stt/diarization.provider';
+import type { SttProvider } from './services/stt/provider';
+import { StructuringService } from './services/structuring.service';
+import { TranscriptionService } from './services/transcription.service';
 
 const RELAY_SECRET = 'relay-secret-at-least-16';
 const RELAY_NOW = 1_700_000_000_000;
+
+const transcriptFixture = JSON.parse(
+  readFileSync(new URL('../../../fixtures/structuring/mixed-id-en-30s.transcript.json', import.meta.url), 'utf8'),
+) as { language: string; segments: Array<{ startMs: number; endMs: number; text: string }> };
+const expectedStructuring = JSON.parse(
+  readFileSync(new URL('../../../fixtures/structuring/mixed-id-en-30s.expected.json', import.meta.url), 'utf8'),
+) as StructuringOutput;
 
 const dockerAvailable =
   !!process.env.DOCKER_HOST ||
@@ -233,5 +246,82 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
       headers: { 'x-internal-api-key': 'test-internal-key-123' },
     });
     expect(ok.statusCode).toBe(200);
+  });
+
+  // ── Phase 3 acceptance: audio → completed Meeting Note (STT/LLM mocked) ──────
+  it('transcribes and structures a meeting end to end with cost metered', async () => {
+    const pipeline = new PipelineService(handle.db);
+    const [ev] = await handle.db
+      .insert(events)
+      .values({ tenantId, source: 'upload', type: 'audio', direction: 'inbound', occurredAt: new Date(), raw: {} })
+      .returning({ id: events.id, occurredAt: events.occurredAt });
+
+    const runId = await pipeline.startRun({ tenantId, jobType: 'upload', refType: 'event', refId: ev!.id });
+    await pipeline.stage(runId, 'ingested', async () => undefined);
+
+    const stt: SttProvider = {
+      transcribe: async () => ({
+        language: transcriptFixture.language,
+        languageConfidence: 1,
+        durationSec: 30,
+        segments: transcriptFixture.segments.map((s) => ({ startMs: s.startMs, endMs: s.endMs, text: s.text })),
+      }),
+    };
+    const transcription = new TranscriptionService({
+      db: handle.db,
+      stt,
+      diarization: new NoopDiarization(),
+      diarizationMode: 'none',
+      pipeline,
+    });
+    const { transcriptId } = await transcription.transcribe({
+      tenantId,
+      eventId: ev!.id,
+      runId,
+      audio: new Uint8Array([1, 2, 3]),
+      filename: 'a.ogg',
+    });
+
+    const llm: LlmClient = {
+      chat: async () => ({
+        content: JSON.stringify(expectedStructuring),
+        modelId: 'deepseek-reasoner',
+        usage: { promptTokens: 1000, completionTokens: 300 },
+        latencyMs: 1,
+      }),
+    };
+    const structuring = new StructuringService({ db: handle.db, llm, pipeline });
+    const { meetingId } = await structuring.structure({
+      tenantId,
+      eventId: ev!.id,
+      transcriptId,
+      runId,
+      occurredAt: ev!.occurredAt,
+    });
+    await pipeline.stage(runId, 'persisted', async () => undefined);
+    await pipeline.completeRun(runId);
+
+    const [meeting] = await handle.db.select().from(meetings).where(eq(meetings.id, meetingId));
+    expect(meeting?.topics.length).toBeGreaterThanOrEqual(1);
+    expect(meeting?.topics[0]?.endMs).toBeLessThanOrEqual(30_000); // within audio duration
+    const taskRows = await handle.db.select().from(tasks).where(eq(tasks.meetingId, meetingId));
+    expect(taskRows).toHaveLength(expectedStructuring.actions.length);
+
+    const [run] = await handle.db.select().from(pipelineRuns).where(eq(pipelineRuns.id, runId));
+    expect(run?.stages.map((s) => s.stage)).toEqual(
+      expect.arrayContaining(['ingested', 'transcribed', 'structured', 'persisted']),
+    );
+    expect(run?.costIdr).toBeGreaterThan(0); // STT seconds + DeepSeek tokens
+
+    // meetings API + speaker confirm round-trip
+    const list = await app.inject({ method: 'GET', url: '/v1/meetings', headers: { authorization: 'Bearer good' } });
+    expect(list.json<{ items: unknown[] }>().items.length).toBeGreaterThanOrEqual(1);
+    const confirm = await app.inject({
+      method: 'POST',
+      url: `/v1/meetings/${meetingId}/participants/S1/confirm`,
+      headers: { authorization: 'Bearer good' },
+      payload: { newEntityName: 'Budi' },
+    });
+    expect(confirm.statusCode).toBe(200);
   });
 });

@@ -6,7 +6,7 @@
  *           Behind the R2Client interface so media/upload paths are testable with a fake.
  * Exports : R2Client, S3R2Client
  */
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export interface R2Config {
@@ -18,6 +18,7 @@ export interface R2Config {
 
 export interface R2Client {
   put(key: string, body: Uint8Array, contentType: string): Promise<void>;
+  get(key: string): Promise<Uint8Array>;
   presignPut(key: string, contentType: string, expiresInSec: number): Promise<string>;
 }
 
@@ -36,6 +37,12 @@ export class S3R2Client implements R2Client {
     await this.s3.send(
       new PutObjectCommand({ Bucket: this.cfg.bucket, Key: key, Body: body, ContentType: contentType }),
     );
+  }
+
+  async get(key: string): Promise<Uint8Array> {
+    const res = await this.s3.send(new GetObjectCommand({ Bucket: this.cfg.bucket, Key: key }));
+    if (!res.Body) throw new Error(`r2 get: empty body for ${key}`);
+    return res.Body.transformToByteArray();
   }
 
   presignPut(key: string, contentType: string, expiresInSec: number): Promise<string> {

@@ -27,7 +27,7 @@ function makeDeps(cfg: {
   const enqueue = vi.fn(async () => undefined);
   return {
     db: makeDb(cfg),
-    r2: { put, presignPut: vi.fn() },
+    r2: { put },
     meta: {
       getMediaMeta: vi.fn(async () => ({ url: 'https://m/x', mimeType: cfg.mimeType, fileSize: 3 })),
       download: vi.fn(async () => new Uint8Array([1, 2, 3])),

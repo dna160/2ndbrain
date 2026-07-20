@@ -11,8 +11,8 @@ import { Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 import type { Database } from '../db/client';
-import { dlq } from '../db/schema';
 import type { MediaJobData, MediaService } from '../services/media.service';
+import { onFailedToDlq } from './dlq';
 
 export interface MediaWorkerDeps {
   connection: Redis;
@@ -29,20 +29,6 @@ export function createMediaWorker(deps: MediaWorkerDeps): Worker<MediaJobData> {
     },
     { connection: deps.connection, concurrency: deps.concurrency ?? 4 },
   );
-
-  worker.on('failed', async (job, err) => {
-    if (!job) return;
-    const maxAttempts = job.opts.attempts ?? 1;
-    if (job.attemptsMade >= maxAttempts) {
-      await deps.db.insert(dlq).values({
-        tenantId: job.data.tenantId,
-        queue: QUEUES.media,
-        jobId: job.id ?? null,
-        payload: job.data as unknown as Record<string, unknown>,
-        error: { message: err.message },
-      });
-    }
-  });
-
+  worker.on('failed', onFailedToDlq(deps.db, QUEUES.media));
   return worker;
 }

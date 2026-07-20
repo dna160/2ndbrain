@@ -14,6 +14,8 @@ const validEnv = {
   R2_BUCKET: 'recall-media',
   LYNKBOT_RELAY_SECRET: 'relay-secret-at-least-16',
   META_ACCESS_TOKEN: 'meta-token',
+  GROQ_API_KEY: 'groq-key',
+  DEEPSEEK_API_KEY: 'deepseek-key',
 } satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {

@@ -1,0 +1,9 @@
+{
+  "language": "id",
+  "segments": [
+    { "startMs": 0, "endMs": 6000, "speakerKey": "S1", "text": "Oke jadi hari ini kita bahas supplier baru untuk Genchai." },
+    { "startMs": 6000, "endMs": 14000, "speakerKey": "S2", "text": "Right, I think we should lock the pricing before Jumat depan." },
+    { "startMs": 14000, "endMs": 22000, "speakerKey": "S1", "text": "Setuju. Aku follow up ke Budi soal MOQ-nya." },
+    { "startMs": 22000, "endMs": 30000, "speakerKey": "S2", "text": "And let's decide on the payment terms next week." }
+  ]
+}

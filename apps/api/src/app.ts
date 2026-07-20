@@ -12,12 +12,14 @@ import type { RelayGuard } from './middleware/relayHmac';
 import { registerIngestRoutes } from './routes/ingest/wa';
 import { registerDlqRoutes } from './routes/internal/dlq';
 import { registerHealthRoutes } from './routes/internal/health';
+import { registerMeetingRoutes } from './routes/v1/meetings';
 import { registerSettingsRoutes } from './routes/v1/settings';
 import { registerUploadRoutes } from './routes/v1/uploads';
 import type { Enqueuer } from './queues';
 import type { IngestService } from './services/ingest.service';
 import type { PipelineService } from './services/pipeline.service';
 import type { R2Client } from './services/r2.service';
+import { SpeakerService } from './services/speaker.service';
 
 /** Phase 2 ingestion wiring — optional so Phase 1 tests can build a minimal app. */
 export interface IngestionDeps {
@@ -82,6 +84,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
     async (scoped) => {
       scoped.addHook('preHandler', requireAuth);
       registerSettingsRoutes(scoped, deps.db);
+      registerMeetingRoutes(scoped, { db: deps.db, speaker: new SpeakerService({ db: deps.db }) });
       if (deps.ingestion) {
         registerUploadRoutes(scoped, {
           db: deps.db,

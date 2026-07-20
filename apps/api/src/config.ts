@@ -34,10 +34,12 @@ const ConfigSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().min(1),
   R2_BUCKET: z.string().min(1),
 
-  // ── Model providers (Phase 3 / 6) ────────────────────────────────────────
-  GROQ_API_KEY: z.string().optional(),
-  DEEPSEEK_API_KEY: z.string().optional(),
-  EMBEDDINGS_API_KEY: z.string().optional(),
+  // ── Model providers ──────────────────────────────────────────────────────
+  GROQ_API_KEY: z.string().min(1), // Phase 3, required (Whisper STT)
+  DEEPSEEK_API_KEY: z.string().min(1), // Phase 3, required (structuring)
+  EMBEDDINGS_API_KEY: z.string().optional(), // Phase 6
+  /** Speaker diarization mode; 'pyannote' is scaffold-only and throws (docs/01 ADR-3). */
+  DIARIZATION: z.enum(['none', 'pyannote']).default('none'),
 
   // ── Lynkbot relay + WhatsApp send ────────────────────────────────────────
   LYNKBOT_RELAY_SECRET: z.string().min(16), // Phase 2, required (HMAC secret)

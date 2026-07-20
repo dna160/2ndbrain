@@ -24,6 +24,9 @@ export const jobTypeSchema = z.enum(JOB_TYPES);
 // ── Ingestion contracts ───────────────────────────────────────────────────────
 export * from './meta';
 
+// ── Meeting Note contracts ────────────────────────────────────────────────────
+export * from './meeting';
+
 // ── API contracts (per phase) ─────────────────────────────────────────────────
 export * from './api/settings';
 export * from './api/uploads';

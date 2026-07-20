@@ -29,7 +29,7 @@ export interface MediaJobData {
 
 export interface MediaDeps {
   db: Database;
-  r2: R2Client;
+  r2: Pick<R2Client, 'put'>;
   meta: MetaMediaClient;
   enqueuer: Pick<Enqueuer, 'enqueue'>;
   pipeline: Pick<PipelineService, 'stage'>;
