@@ -31,6 +31,9 @@ export * from './meeting';
 export * from './calendar';
 export * from './conversations';
 
+// ── Memory contracts ──────────────────────────────────────────────────────────
+export * from './memory';
+
 // ── API contracts (per phase) ─────────────────────────────────────────────────
 export * from './api/settings';
 export * from './api/uploads';

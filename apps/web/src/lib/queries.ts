@@ -9,6 +9,9 @@ import {
   meetingListItemSchema,
   pipelineRunListItemSchema,
   queueDepthSchema,
+  graphSchema,
+  memoryDtoSchema,
+  memoryReviewDtoSchema,
   sendReplyResponseSchema,
   taskListItemSchema,
   taskPatchSchema,
@@ -197,5 +200,50 @@ export function useSendReply(waId: string) {
       return { needsConfirm: false, delivery: parsed.delivery };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['thread', waId] }),
+  });
+}
+
+// ── Memory ──────────────────────────────────────────────────────────────────
+export function useMemories(q: string) {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['memories', q],
+    queryFn: async () =>
+      (await apiFetch(`/v1/memory/search?q=${encodeURIComponent(q)}`, listOf(memoryDtoSchema), { token: await getToken() }))
+        .items,
+  });
+}
+
+export function useReviews() {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['reviews'],
+    queryFn: async () =>
+      (await apiFetch('/v1/memory/reviews', listOf(memoryReviewDtoSchema), { token: await getToken() })).items,
+  });
+}
+
+export function useGraph() {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['graph'],
+    queryFn: async () => apiFetch('/v1/memory/graph', graphSchema, { token: await getToken() }),
+  });
+}
+
+export function useResolveReview() {
+  const getToken = useToken();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, resolution, content }: { id: string; resolution: 'approved' | 'edited' | 'rejected'; content?: string }) =>
+      apiFetch(`/v1/memory/reviews/${id}/resolve`, z.object({ resolved: z.boolean() }), {
+        method: 'POST',
+        body: { resolution, content },
+        token: await getToken(),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['reviews'] });
+      void qc.invalidateQueries({ queryKey: ['memories'] });
+    },
   });
 }

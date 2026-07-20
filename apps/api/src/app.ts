@@ -16,6 +16,7 @@ import { registerCalendarRoutes } from './routes/v1/calendar';
 import { registerConversationRoutes } from './routes/v1/conversations';
 import { registerEventRoutes } from './routes/v1/events';
 import { registerMeetingRoutes } from './routes/v1/meetings';
+import { registerMemoryRoutes } from './routes/v1/memory';
 import { registerPipelineRoutes } from './routes/v1/pipeline';
 import { registerSettingsRoutes } from './routes/v1/settings';
 import { registerTaskRoutes } from './routes/v1/tasks';
@@ -26,6 +27,7 @@ import type { ConversationsService } from './services/conversations.service';
 import type { IngestService } from './services/ingest.service';
 import type { PipelineService } from './services/pipeline.service';
 import type { R2Client } from './services/r2.service';
+import { GraphService } from './services/memory/graph.service';
 import { SpeakerService } from './services/speaker.service';
 
 /** Phase 2 ingestion wiring — optional so Phase 1 tests can build a minimal app. */
@@ -96,6 +98,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       registerMeetingRoutes(scoped, { db: deps.db, speaker: new SpeakerService({ db: deps.db }) });
       registerEventRoutes(scoped, deps.db);
       registerTaskRoutes(scoped, deps.db);
+      registerMemoryRoutes(scoped, { db: deps.db, graph: new GraphService(deps.db) });
       if (deps.calendarConversations) {
         registerCalendarRoutes(scoped, {
           db: deps.db,

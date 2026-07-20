@@ -20,7 +20,7 @@ export interface BriefsDeps {
   llm: LlmClient;
   waSend: Pick<WaSendService, 'send'>;
   operatorWaId: string;
-  retrieval?: (eventId: string) => Promise<string | undefined>;
+  retrieval?: (tenantId: string, eventId: string) => Promise<string | undefined>;
   now?: () => Date;
 }
 
@@ -51,7 +51,7 @@ export class BriefsService {
     for (const ev of upcoming) {
       const attendees = ev.attendees as CalendarAttendee[];
       if (attendees.length === 0) continue;
-      const context = await this.deps.retrieval?.(ev.id);
+      const context = await this.deps.retrieval?.(tenantId, ev.id);
       const brief = await this.buildBrief(ev.title ?? 'Meeting', attendees, context);
       await this.deps.waSend.send(this.deps.operatorWaId, brief);
       await this.deps.db

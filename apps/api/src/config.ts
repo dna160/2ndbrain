@@ -37,7 +37,8 @@ const ConfigSchema = z.object({
   // ── Model providers ──────────────────────────────────────────────────────
   GROQ_API_KEY: z.string().min(1), // Phase 3, required (Whisper STT)
   DEEPSEEK_API_KEY: z.string().min(1), // Phase 3, required (structuring)
-  EMBEDDINGS_API_KEY: z.string().optional(), // Phase 6
+  EMBEDDINGS_API_KEY: z.string().min(1), // Phase 6, required (BGE-M3 embeddings)
+  EMBEDDINGS_URL: z.string().url().default('http://localhost:8080/embed'), // BGE-M3 endpoint
   /** Speaker diarization mode; 'pyannote' is scaffold-only and throws (docs/01 ADR-3). */
   DIARIZATION: z.enum(['none', 'pyannote']).default('none'),
 

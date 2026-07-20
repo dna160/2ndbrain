@@ -15,6 +15,10 @@ import { GoogleApiCalendarClient } from './services/google/calendar.client';
 import { googleTokenProvider } from './services/google/token';
 import { DeepSeekClient } from './services/llm/deepseek';
 import { MediaService } from './services/media.service';
+import { ConsolidationService } from './services/memory/consolidation.service';
+import { Bge3EmbeddingsProvider } from './services/memory/embeddings';
+import { GraphService } from './services/memory/graph.service';
+import { RetrievalService } from './services/memory/retrieval.service';
 import { GraphMetaMediaClient } from './services/meta/media.client';
 import { GraphMetaSendClient } from './services/meta/send.client';
 import { PipelineService } from './services/pipeline.service';
@@ -60,7 +64,24 @@ async function main(): Promise<void> {
     diarizationMode: config.DIARIZATION,
     pipeline,
   });
-  const structuring = new StructuringService({ db, llm: new DeepSeekClient(config.DEEPSEEK_API_KEY), pipeline });
+  // ── Memory (Phase 6): embeddings + graph + retrieval + consolidation ────────
+  const embeddings = new Bge3EmbeddingsProvider(config.EMBEDDINGS_API_KEY, config.EMBEDDINGS_URL);
+  const graph = new GraphService(db);
+  const retrieval = new RetrievalService({ db, embeddings });
+  const consolidation = new ConsolidationService({
+    db,
+    llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
+    embeddings,
+    graph,
+  });
+
+  const structuring = new StructuringService({
+    db,
+    llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
+    pipeline,
+    // Per-participant memory context for recommendations (docs/00 F4).
+    retrieval: (job) => retrieval.contextFor(job.tenantId, { includeSensitive: false }),
+  });
 
   const calendar = new CalendarService({
     db,
@@ -85,13 +106,14 @@ async function main(): Promise<void> {
       templateName: config.WA_UTILITY_TEMPLATE,
     }),
     operatorWaId: operator?.waId ?? '',
+    retrieval: (tenantId, _eventId) => retrieval.contextFor(tenantId, { includeSensitive: false }),
   });
 
   const workers: Worker[] = [
     createMediaWorker({ connection, db, media }),
     createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
     createStructuringWorker({ connection, db, structuring, pipeline }),
-    ...(await createScheduledWorkers({ connection, db, calendar, briefs })),
+    ...(await createScheduledWorkers({ connection, db, calendar, briefs, consolidation })),
   ];
   console.log('[worker] booted — media, transcription, structuring, calendar-sync, briefs.');
 

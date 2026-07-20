@@ -18,6 +18,7 @@ const validEnv = {
   DEEPSEEK_API_KEY: 'deepseek-key',
   LYNKBOT_INTERNAL_URL: 'http://lynkbot.internal',
   META_PHONE_NUMBER_ID: 'pn-1',
+  EMBEDDINGS_API_KEY: 'embed-key',
 } satisfies NodeJS.ProcessEnv;
 
 describe('loadConfig', () => {

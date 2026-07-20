@@ -31,6 +31,7 @@ export default defineConfig({
         '**/auth/authenticator.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/middleware/relayHmac.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/services/waSend.service.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+        '**/services/memory/math.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/middleware/internalApiKey.ts': {
           statements: 100,
           branches: 100,

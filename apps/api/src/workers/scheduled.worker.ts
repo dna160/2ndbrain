@@ -13,6 +13,7 @@ import type { Database } from '../db/client';
 import { connectedAccounts, tenants } from '../db/schema';
 import type { BriefsService } from '../services/briefs.service';
 import type { CalendarService } from '../services/calendar.service';
+import type { ConsolidationService } from '../services/memory/consolidation.service';
 import { onFailedToDlq } from './dlq';
 
 export interface ScheduledDeps {
@@ -20,6 +21,7 @@ export interface ScheduledDeps {
   db: Database;
   calendar: CalendarService;
   briefs: BriefsService;
+  consolidation: ConsolidationService;
 }
 
 export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worker[]> {
@@ -27,6 +29,9 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   await calQueue.add('sync', {}, { repeat: { every: 15 * 60_000 }, jobId: 'calendar-sync', removeOnComplete: 50 });
   const briefQueue = new Queue(QUEUES.briefs, { connection: deps.connection });
   await briefQueue.add('scan', {}, { repeat: { every: 10 * 60_000 }, jobId: 'briefs-scan', removeOnComplete: 50 });
+  const consolidationQueue = new Queue(QUEUES.consolidation, { connection: deps.connection });
+  // Nightly 20:30 WIB = 13:30 UTC (docs/03 Phase 6).
+  await consolidationQueue.add('nightly', {}, { repeat: { pattern: '30 13 * * *' }, jobId: 'consolidation-nightly', removeOnComplete: 30 });
 
   const calWorker = new Worker(
     QUEUES.calendarSync,
@@ -50,5 +55,15 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   );
   briefWorker.on('failed', onFailedToDlq(deps.db, QUEUES.briefs));
 
-  return [calWorker, briefWorker];
+  const consolidationWorker = new Worker(
+    QUEUES.consolidation,
+    async () => {
+      const rows = await deps.db.select({ id: tenants.id }).from(tenants);
+      for (const t of rows) await deps.consolidation.consolidate(t.id);
+    },
+    { connection: deps.connection },
+  );
+  consolidationWorker.on('failed', onFailedToDlq(deps.db, QUEUES.consolidation));
+
+  return [calWorker, briefWorker, consolidationWorker];
 }
