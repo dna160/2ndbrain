@@ -14,6 +14,7 @@ import { registerDlqRoutes } from './routes/internal/dlq';
 import { registerHealthRoutes } from './routes/internal/health';
 import { registerCalendarRoutes } from './routes/v1/calendar';
 import { registerConversationRoutes } from './routes/v1/conversations';
+import { registerDigestRoutes } from './routes/v1/digests';
 import { registerEventRoutes } from './routes/v1/events';
 import { registerMeetingRoutes } from './routes/v1/meetings';
 import { registerMemoryRoutes } from './routes/v1/memory';
@@ -24,6 +25,7 @@ import { registerUploadRoutes } from './routes/v1/uploads';
 import type { Enqueuer, QueueStats } from './queues';
 import type { CalendarService } from './services/calendar.service';
 import type { ConversationsService } from './services/conversations.service';
+import type { DigestService } from './services/digest.service';
 import type { IngestService } from './services/ingest.service';
 import type { PipelineService } from './services/pipeline.service';
 import type { R2Client } from './services/r2.service';
@@ -50,6 +52,7 @@ export interface BuildAppDeps {
   logger?: boolean;
   ingestion?: IngestionDeps;
   calendarConversations?: { calendar: CalendarService; conversations: ConversationsService };
+  digest?: DigestService;
 }
 
 export function buildApp(deps: BuildAppDeps): FastifyInstance {
@@ -99,6 +102,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       registerEventRoutes(scoped, deps.db);
       registerTaskRoutes(scoped, deps.db);
       registerMemoryRoutes(scoped, { db: deps.db, graph: new GraphService(deps.db) });
+      if (deps.digest) registerDigestRoutes(scoped, { db: deps.db, digest: deps.digest });
       if (deps.calendarConversations) {
         registerCalendarRoutes(scoped, {
           db: deps.db,

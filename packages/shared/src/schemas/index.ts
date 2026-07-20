@@ -34,6 +34,9 @@ export * from './conversations';
 // ── Memory contracts ──────────────────────────────────────────────────────────
 export * from './memory';
 
+// ── Digest contracts ──────────────────────────────────────────────────────────
+export * from './digest';
+
 // ── API contracts (per phase) ─────────────────────────────────────────────────
 export * from './api/settings';
 export * from './api/uploads';

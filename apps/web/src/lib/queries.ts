@@ -9,6 +9,8 @@ import {
   meetingListItemSchema,
   pipelineRunListItemSchema,
   queueDepthSchema,
+  digestDetailSchema,
+  digestListItemSchema,
   graphSchema,
   memoryDtoSchema,
   memoryReviewDtoSchema,
@@ -245,5 +247,35 @@ export function useResolveReview() {
       void qc.invalidateQueries({ queryKey: ['reviews'] });
       void qc.invalidateQueries({ queryKey: ['memories'] });
     },
+  });
+}
+
+// ── Digests ─────────────────────────────────────────────────────────────────
+export function useDigests() {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['digests'],
+    queryFn: async () =>
+      (await apiFetch('/v1/digests', listOf(digestListItemSchema), { token: await getToken() })).items,
+  });
+}
+
+export function useDigest(id: string | null) {
+  const getToken = useToken();
+  return useQuery({
+    queryKey: ['digest', id],
+    enabled: Boolean(id),
+    queryFn: async () => apiFetch(`/v1/digests/${id}`, digestDetailSchema, { token: await getToken() }),
+  });
+}
+
+export function useResendDigest() {
+  const getToken = useToken();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      apiFetch(`/v1/digests/${id}/resend`, z.object({ deliveredVia: z.string() }), {
+        method: 'POST',
+        token: await getToken(),
+      }),
   });
 }

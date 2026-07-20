@@ -13,6 +13,7 @@ import { BriefsService } from './services/briefs.service';
 import { CalendarService } from './services/calendar.service';
 import { GoogleApiCalendarClient } from './services/google/calendar.client';
 import { googleTokenProvider } from './services/google/token';
+import { DigestService } from './services/digest.service';
 import { DeepSeekClient } from './services/llm/deepseek';
 import { MediaService } from './services/media.service';
 import { ConsolidationService } from './services/memory/consolidation.service';
@@ -108,12 +109,24 @@ async function main(): Promise<void> {
     operatorWaId: operator?.waId ?? '',
     retrieval: (tenantId, _eventId) => retrieval.contextFor(tenantId, { includeSensitive: false }),
   });
+  const digest = new DigestService({
+    db,
+    llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
+    retrieval,
+    waSend: new WaSendService({
+      db,
+      meta: new GraphMetaSendClient(config.META_ACCESS_TOKEN, config.META_PHONE_NUMBER_ID),
+      templateName: config.WA_UTILITY_TEMPLATE,
+    }),
+    calendar,
+    operatorWaId: operator?.waId ?? '',
+  });
 
   const workers: Worker[] = [
     createMediaWorker({ connection, db, media }),
     createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
     createStructuringWorker({ connection, db, structuring, pipeline }),
-    ...(await createScheduledWorkers({ connection, db, calendar, briefs, consolidation })),
+    ...(await createScheduledWorkers({ connection, db, calendar, briefs, consolidation, digest })),
   ];
   console.log('[worker] booted — media, transcription, structuring, calendar-sync, briefs.');
 

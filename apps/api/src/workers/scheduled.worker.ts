@@ -13,6 +13,7 @@ import type { Database } from '../db/client';
 import { connectedAccounts, tenants } from '../db/schema';
 import type { BriefsService } from '../services/briefs.service';
 import type { CalendarService } from '../services/calendar.service';
+import type { DigestService } from '../services/digest.service';
 import type { ConsolidationService } from '../services/memory/consolidation.service';
 import { onFailedToDlq } from './dlq';
 
@@ -22,6 +23,7 @@ export interface ScheduledDeps {
   calendar: CalendarService;
   briefs: BriefsService;
   consolidation: ConsolidationService;
+  digest: DigestService;
 }
 
 export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worker[]> {
@@ -32,6 +34,9 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   const consolidationQueue = new Queue(QUEUES.consolidation, { connection: deps.connection });
   // Nightly 20:30 WIB = 13:30 UTC (docs/03 Phase 6).
   await consolidationQueue.add('nightly', {}, { repeat: { pattern: '30 13 * * *' }, jobId: 'consolidation-nightly', removeOnComplete: 30 });
+  const digestQueue = new Queue(QUEUES.digest, { connection: deps.connection });
+  // Nightly 21:00 WIB = 14:00 UTC (docs/00 F5).
+  await digestQueue.add('nightly', {}, { repeat: { pattern: '0 14 * * *' }, jobId: 'digest-nightly', removeOnComplete: 30 });
 
   const calWorker = new Worker(
     QUEUES.calendarSync,
@@ -65,5 +70,15 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   );
   consolidationWorker.on('failed', onFailedToDlq(deps.db, QUEUES.consolidation));
 
-  return [calWorker, briefWorker, consolidationWorker];
+  const digestWorker = new Worker(
+    QUEUES.digest,
+    async () => {
+      const rows = await deps.db.select({ id: tenants.id }).from(tenants);
+      for (const t of rows) await deps.digest.run(t.id);
+    },
+    { connection: deps.connection },
+  );
+  digestWorker.on('failed', onFailedToDlq(deps.db, QUEUES.digest));
+
+  return [calWorker, briefWorker, consolidationWorker, digestWorker];
 }

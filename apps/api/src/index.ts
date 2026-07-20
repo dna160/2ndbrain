@@ -2,22 +2,26 @@
  * Fastify HTTP bootstrap (MODE=http). Wires Postgres/Clerk/Redis/R2 + ingestion into
  * buildApp and listens. The worker shares this image under MODE=worker (docs/01 §1).
  */
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
 import { buildApp } from './app';
 import { createAuthenticator } from './auth/authenticator';
 import { clerkVerify, resolveTenantFromDb } from './auth/clerk';
 import { loadConfig } from './config';
 import { createDb } from './db/client';
-import { tenants, users } from './db/schema';
+import { tenants, users, waContacts } from './db/schema';
 import { makeRelayHmacGuard } from './middleware/relayHmac';
 import { BullEnqueuer, createQueueStats, createRedisConnection } from './queues';
 import { CalendarService } from './services/calendar.service';
 import { ConversationsService } from './services/conversations.service';
+import { DigestService } from './services/digest.service';
 import { GoogleApiCalendarClient } from './services/google/calendar.client';
 import { googleTokenProvider } from './services/google/token';
 import { IngestService } from './services/ingest.service';
+import { DeepSeekClient } from './services/llm/deepseek';
 import { LynkbotTakeoverClient } from './services/lynkbot.client';
+import { Bge3EmbeddingsProvider } from './services/memory/embeddings';
+import { RetrievalService } from './services/memory/retrieval.service';
 import { GraphMetaSendClient } from './services/meta/send.client';
 import { PipelineService } from './services/pipeline.service';
 import { S3R2Client } from './services/r2.service';
@@ -80,6 +84,19 @@ async function main(): Promise<void> {
       googleTokenProvider(config.CLERK_SECRET_KEY, resolveOwnerClerkUserId),
     ),
   });
+  const digest = new DigestService({
+    db,
+    llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
+    retrieval: new RetrievalService({
+      db,
+      embeddings: new Bge3EmbeddingsProvider(config.EMBEDDINGS_API_KEY, config.EMBEDDINGS_URL),
+    }),
+    waSend,
+    calendar,
+    operatorWaId:
+      (await db.select({ waId: waContacts.waId }).from(waContacts).where(eq(waContacts.label, 'Operator')).limit(1))[0]
+        ?.waId ?? '',
+  });
 
   const app = buildApp({
     db,
@@ -97,6 +114,7 @@ async function main(): Promise<void> {
       internalApiKey: config.INTERNAL_API_KEY,
     },
     calendarConversations: { calendar, conversations },
+    digest,
   });
 
   try {

@@ -19,6 +19,22 @@ Produce STRICT JSON matching the provided schema. Rules:
 - RECOMMENDATIONS: strategic advice per participant for the operator. If PARTICIPANT CONTEXT is provided, ground advice in it and reference the grounding. If absent, derive only from this transcript. Direct, specific, no generic advice.
 Output JSON only.`;
 
+export const DIGEST_SYSTEM = `You are the nightly digest engine. Input: today's events, open tasks, tomorrow's calendar, memory context. STRICT JSON: sections happened[], commitmentsByMe[], commitmentsToMe[], conflicts[], recommendations[]. Every item: text + provenanceEventIds (required) — an item you cannot source does not exist. recommendations: ranked, each typed {kind: book|reply|prepare|decide, text, urgency 1-3, draftPayload? (for kind=book: title, proposed ISO start/end, attendees)}. Conflicts include tomorrow's calendar overlaps and commitment-vs-calendar collisions. Concise, operator-grade, no filler. Bilingual input; digest prose in the operator's dominant language of the day; task/recommendation text in English.`;
+
+export function buildDigestUser(input: {
+  events: Array<{ id: string; content: string | null }>;
+  tasks: Array<{ id: string; title: string }>;
+  tomorrow: Array<{ id: string; title: string | null; startAt: string }>;
+  memoryContext: string;
+}): string {
+  return [
+    `TODAY'S EVENTS:\n${input.events.map((e) => `[${e.id}] ${e.content ?? '(no text)'}`).join('\n') || 'none'}`,
+    `OPEN TASKS:\n${input.tasks.map((t) => `[${t.id}] ${t.title}`).join('\n') || 'none'}`,
+    `TOMORROW'S CALENDAR:\n${input.tomorrow.map((c) => `[${c.id}] ${c.startAt} ${c.title ?? ''}`).join('\n') || 'none'}`,
+    `MEMORY CONTEXT:\n${input.memoryContext || 'none'}`,
+  ].join('\n\n');
+}
+
 export const CONSOLIDATION_SYSTEM = `You are the memory consolidation engine of Recall. Input: today's normalized events (messages, meeting summaries, calendar items) plus the current entity roster (id, kind, name, aka). Extract durable knowledge. STRICT JSON per schema.
 
 - FACTS: atomic, self-contained statements worth remembering beyond this week. One fact = one claim. Attach entityRefs (existing ids, or {newEntity:{kind,name}} when clearly new), confidence 0-1, and sourceEventIds (REQUIRED, non-empty). Exclude trivia, pleasantries, and anything true only today.
