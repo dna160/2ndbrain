@@ -1,0 +1,24 @@
+/*
+ * Phase 0 baseline reset only. The real design-system tokens (docs/02) land in
+ * styles/tokens.css in Phase 4; this file is intentionally minimal until then.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background: #fafaf9;
+  color: #1a1a18;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}

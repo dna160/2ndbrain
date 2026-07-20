@@ -1,0 +1,28 @@
+# Shared image for the `api` and `worker` Railway services (docs/01 §1).
+# The worker is this same image booted with MODE=worker (see infra/railway.json).
+FROM node:20-slim AS base
+ENV PNPM_HOME="/pnpm" PATH="/pnpm:$PATH"
+RUN corepack enable
+WORKDIR /app
+
+# ── Install workspace deps (cached on lockfile) ──────────────────────────────
+FROM base AS deps
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/shared/package.json packages/shared/package.json
+COPY apps/api/package.json apps/api/package.json
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter @recall/api...
+
+# ── Runtime image ────────────────────────────────────────────────────────────
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared ./packages/shared
+COPY apps/api ./apps/api
+
+EXPOSE 3001
+# MODE switches entrypoint; startCommand in railway.json overrides for the worker.
+CMD ["pnpm", "--filter", "@recall/api", "start"]
