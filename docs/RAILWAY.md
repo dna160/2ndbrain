@@ -37,6 +37,18 @@ For each, set **Settings → Config-as-code / Railway Config File** to the match
 
 Leave **Root Directory empty** (the Dockerfiles COPY from the repo root; that is the build context).
 
+> ### ⚠️ Dashboard/API overrides silently beat `railway.json`
+> Setting a field via the Railway dashboard or API (e.g. `preDeployCommand`) creates a
+> **service-level override that wins over the config file from then on** — editing
+> `infra/railway.*.json` afterwards has NO effect, with no warning. Always confirm what
+> Railway will actually run by reading the service config, not the repo.
+>
+> Two related traps:
+> - **Redeploy replays the old snapshot.** It re-runs the same commit *and* the same config,
+>   so it will not pick up a config change. Push (auto-deploy) to get a fresh deployment.
+> - **Applying variables does not deploy.** Variables become live only on the next deployment,
+>   so a pre-deploy step that reads them keeps seeing the old environment until then.
+
 > **Fallback if config-as-code isn't available on your plan:** per service set the variable
 > `RAILWAY_DOCKERFILE_PATH` (`infra/Dockerfile.api` for api+worker, `infra/Dockerfile.web` for web)
 > and set the **Custom Start Command** in Settings to the `startCommand` shown in each config file.
