@@ -5,6 +5,7 @@
     "dockerfilePath": "infra/Dockerfile.api"
   },
   "deploy": {
+    "preDeployCommand": "pnpm --filter @recall/api db:migrate",
     "startCommand": "pnpm --filter @recall/api start",
     "healthcheckPath": "/internal/health",
     "healthcheckTimeout": 30,

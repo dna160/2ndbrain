@@ -91,12 +91,17 @@ CLERK_SECRET_KEY=sk_live_...                    # server-side auth() at runtime
 ## 3. First deploy order
 
 1. Deploy **Postgres (pgvector)** + **Redis**.
-2. Deploy **recall-api**. Once healthy, run migrations + seed from the api service shell:
-   `pnpm --filter @recall/api db:migrate` then `pnpm --filter @recall/api db:seed`
-   (override seed with `SEED_CLERK_USER_ID` / `SEED_OPERATOR_WAID`). Migrations are idempotent.
-3. Deploy **recall-worker** and **recall-web**. Generate domains for api + web; set `APP_URL` to the
+2. Deploy **recall-api**. Migrations run automatically via `deploy.preDeployCommand`
+   (`db:migrate`) before the new release goes live — they are idempotent, so every deploy
+   re-runs them harmlessly. Deploy api BEFORE worker: the worker reads `waContacts` at boot
+   and crash-loops with `relation "wa_contacts" does not exist` against an unmigrated DB.
+3. Seed once, manually, from the api service shell — it is NOT automated because the defaults
+   are placeholders (`user_seed_operator` / waId `000000000000`) and a bogus Operator contact
+   would become the digest recipient:
+   `SEED_CLERK_USER_ID=<real> SEED_OPERATOR_WAID=<real> pnpm --filter @recall/api db:seed`
+4. Deploy **recall-worker** and **recall-web**. Generate domains for api + web; set `APP_URL` to the
    web domain.
-4. Verify `GET https://<api>/internal/health` → `200 {"status":"ok","db":true,"redis":true}`.
+5. Verify `GET https://<api>/internal/health` → `200 {"status":"ok","db":true,"redis":true}`.
 
 Then apply the two **Lynkbot PRs** (`docs/lynkbot-pr/`) so inbound WhatsApp relays to
 `https://<api>/ingest/wa`. Ports are automatic — the api binds `$PORT`, Next binds `$PORT`.
