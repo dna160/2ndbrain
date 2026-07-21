@@ -61,7 +61,10 @@ async function main(): Promise<void> {
   });
   const transcription = new TranscriptionService({
     db,
-    stt: new GroqWhisperProvider(config.GROQ_API_KEY),
+    stt: new GroqWhisperProvider(config.GROQ_API_KEY, undefined, undefined, {
+      language: config.STT_LANGUAGE,
+      prompt: config.STT_PROMPT,
+    }),
     diarization: getDiarizationProvider(config.DIARIZATION),
     diarizationMode: config.DIARIZATION,
     pipeline,

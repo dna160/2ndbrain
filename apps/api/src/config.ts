@@ -43,6 +43,12 @@ const ConfigSchema = z.object({
   EMBEDDINGS_URL: z.string().url().default('http://localhost:8080/embed'), // BGE-M3 endpoint
   /** Speaker diarization mode; 'pyannote' is scaffold-only and throws (docs/01 ADR-3). */
   DIARIZATION: z.enum(['none', 'pyannote']).default('none'),
+  /** ISO-639-1 STT hint, e.g. 'id'. Unset = Whisper auto-detects per window (drifts on
+   *  ID/EN code-switching). Set it when one language dominates. */
+  STT_LANGUAGE: z.string().min(2).max(5).optional(),
+  /** Whisper initial prompt — seed people/company/product names so they stop being
+   *  transcribed phonetically. Only the last ~224 tokens are used. */
+  STT_PROMPT: z.string().optional(),
 
   // ── WhatsApp Cloud API (direct — Recall owns the WABA connection) ────────
   META_ACCESS_TOKEN: z.string().min(1), // required (media fetch + outbound send)
