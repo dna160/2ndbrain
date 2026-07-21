@@ -8,8 +8,8 @@ FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter @recall/web...
+# No BuildKit cache mount — see the note in Dockerfile.api (Railway cacheKey constraint).
+RUN pnpm install --frozen-lockfile --filter @recall/web...
 
 FROM deps AS build
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./

@@ -10,8 +10,10 @@ FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/api/package.json apps/api/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter @recall/api...
+# No BuildKit cache mount: Railway requires the id to be `s/<service id>-<target>` and
+# forbids variables in it, but api and worker are two services sharing this Dockerfile —
+# no single hardcoded id works, and hardcoding one would break local + CI builds.
+RUN pnpm install --frozen-lockfile --filter @recall/api...
 
 # ── Runtime image ────────────────────────────────────────────────────────────
 FROM base AS runtime
