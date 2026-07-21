@@ -53,6 +53,13 @@ const ConfigSchema = z.object({
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(1),
   /** Approved utility template name for out-of-window sends (docs/00 F5). */
   WA_UTILITY_TEMPLATE: z.string().default('daily_brief_ready'),
+
+  // ── Single-tenant bootstrap (idempotent, applied at api boot) ────────────
+  // Both must be set for provisioning to run; neither has a fallback, because the seeded
+  // 'Operator' contact is the nightly digest's recipient.
+  SEED_CLERK_USER_ID: z.string().optional(),
+  SEED_OPERATOR_WAID: z.string().optional(),
+  SEED_TENANT_NAME: z.string().default('Operator Tenant'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

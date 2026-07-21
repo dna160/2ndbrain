@@ -9,6 +9,7 @@ import { createAuthenticator } from './auth/authenticator';
 import { clerkVerify, resolveTenantFromDb } from './auth/clerk';
 import { loadConfig } from './config';
 import { createDb } from './db/client';
+import { seed } from './db/seed';
 import { tenants, users, waContacts } from './db/schema';
 import { makeMetaSignatureGuard } from './middleware/metaSignature';
 import { BullEnqueuer, createQueueStats, createRedisConnection } from './queues';
@@ -29,6 +30,24 @@ import { WaSendService } from './services/waSend.service';
 async function main(): Promise<void> {
   const config = loadConfig();
   const { db } = createDb(config.DATABASE_URL);
+
+  // Provision the single tenant at boot, idempotently. This deliberately does NOT live in
+  // Railway's preDeployCommand: that field cannot chain commands — `&&` is stored verbatim
+  // and never shell-interpreted, so only the first command ever runs — and a value set via
+  // the dashboard/API silently overrides infra/railway.api.json. Booting is the one path
+  // guaranteed to execute, so provisioning belongs here.
+  if (config.SEED_CLERK_USER_ID && config.SEED_OPERATOR_WAID) {
+    const { tenantId } = await seed(config.DATABASE_URL, {
+      tenantName: config.SEED_TENANT_NAME,
+      clerkUserId: config.SEED_CLERK_USER_ID,
+      operatorWaId: config.SEED_OPERATOR_WAID,
+    });
+    console.log(`[boot] tenant provisioned: ${tenantId}`);
+  } else {
+    console.warn('[boot] SEED_CLERK_USER_ID / SEED_OPERATOR_WAID unset — tenant NOT provisioned;'
+      + ' inbound webhooks will 503 and /v1 will 403.');
+  }
+
   const connection = createRedisConnection(config.REDIS_URL);
 
   const enqueuer = new BullEnqueuer(connection);
