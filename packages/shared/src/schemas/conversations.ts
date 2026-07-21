@@ -20,7 +20,7 @@ export const conversationMessageSchema = z.object({
   type: z.string(),
   content: z.string().nullable(),
   occurredAt: z.string().datetime(),
-  /** 'lynkbot_bot' when the message is a relayed bot reply. */
+  /** Message origin label, e.g. 'operator' for replies Recall sent. */
   origin: z.string().nullable(),
 });
 export type ConversationMessage = z.infer<typeof conversationMessageSchema>;

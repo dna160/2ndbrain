@@ -21,7 +21,7 @@ import { createAuthenticator } from './auth/authenticator';
 import { resolveTenantFromDb } from './auth/clerk';
 import { createDb, type DbHandle } from './db/client';
 import { runMigrations } from './db/migrate';
-import { makeRelayHmacGuard } from './middleware/relayHmac';
+import { makeMetaSignatureGuard } from './middleware/metaSignature';
 import { events, meetings, pipelineRuns, tasks } from './db/schema';
 import { seed } from './db/seed';
 import { IngestService } from './services/ingest.service';
@@ -32,8 +32,7 @@ import type { SttProvider } from './services/stt/provider';
 import { StructuringService } from './services/structuring.service';
 import { TranscriptionService } from './services/transcription.service';
 
-const RELAY_SECRET = 'relay-secret-at-least-16';
-const RELAY_NOW = 1_700_000_000_000;
+const APP_SECRET = 'da5cbd8dce8821884b190b2a344387ad';
 
 const transcriptFixture = JSON.parse(
   readFileSync(new URL('../../../fixtures/structuring/mixed-id-en-30s.transcript.json', import.meta.url), 'utf8'),
@@ -86,11 +85,8 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
           enqueuer: { enqueue },
           pipeline: new PipelineService(handle.db),
         }),
-        relayGuard: makeRelayHmacGuard({
-          secret: RELAY_SECRET,
-          maxSkewMs: 300_000,
-          now: () => RELAY_NOW,
-        }),
+        metaGuard: makeMetaSignatureGuard({ appSecret: APP_SECRET }),
+        metaVerifyToken: 'verify-token',
         resolveTenantId: async () => tenantId,
         r2: { presignPut: async () => 'https://r2.example/put' },
         enqueuer: { enqueue },
@@ -102,22 +98,21 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
     await app.ready();
   });
 
-  function postRelay(body: unknown) {
+  function postWebhook(body: unknown) {
     const raw = JSON.stringify(body);
-    const signature = createHmac('sha256', RELAY_SECRET).update(`${RELAY_NOW}.${raw}`).digest('hex');
+    const signature = `sha256=${createHmac('sha256', APP_SECRET).update(raw).digest('hex')}`;
     return app.inject({
       method: 'POST',
-      url: '/ingest/wa',
+      url: '/webhooks/meta',
       headers: {
         'content-type': 'application/json',
-        'x-relay-timestamp': String(RELAY_NOW),
-        'x-relay-signature': signature,
+        'x-hub-signature-256': signature,
       },
       payload: raw,
     });
   }
 
-  function relayTextBody(waId: string, msgId: string) {
+  function metaTextBody(waId: string, msgId: string) {
     return {
       entry: [
         {
@@ -201,12 +196,12 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
   });
 
   // ── Phase 2 acceptance ──────────────────────────────────────────────────────
-  it('ingests a relayed message idempotently — replay yields no new rows', async () => {
-    const first = await postRelay(relayTextBody('628int', 'wamid.INT1'));
+  it('ingests a webhook message idempotently — replay yields no new rows', async () => {
+    const first = await postWebhook(metaTextBody('628int', 'wamid.INT1'));
     expect(first.statusCode).toBe(200);
     expect(first.json()).toMatchObject({ persisted: 1, duplicates: 0 });
 
-    const second = await postRelay(relayTextBody('628int', 'wamid.INT1'));
+    const second = await postWebhook(metaTextBody('628int', 'wamid.INT1'));
     expect(second.statusCode).toBe(200);
     expect(second.json()).toMatchObject({ persisted: 0, duplicates: 1 });
 
@@ -214,10 +209,10 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
     expect(rows).toHaveLength(1);
   });
 
-  it('rejects an unsigned relay POST', async () => {
+  it('rejects an unsigned webhook POST', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/ingest/wa',
+      url: '/webhooks/meta',
       headers: { 'content-type': 'application/json' },
       payload: '{}',
     });
@@ -231,7 +226,7 @@ describe.skipIf(!dockerAvailable)('Phase 1 integration', () => {
       headers: { authorization: 'Bearer good' },
       payload: { waId: '628blocked' },
     });
-    const res = await postRelay(relayTextBody('628blocked', 'wamid.BLK1'));
+    const res = await postWebhook(metaTextBody('628blocked', 'wamid.BLK1'));
     expect(res.json()).toMatchObject({ dropped: 1, persisted: 0 });
 
     const rows = await handle.db.select().from(events).where(eq(events.externalId, 'wamid.BLK1'));

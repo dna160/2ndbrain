@@ -3,7 +3,7 @@
  * Package : apps/api
  * File    : src/services/meta/extract.ts
  * Role    : Pure extraction of inbound messages from a Meta WhatsApp webhook body
- *           (relayed verbatim by Lynkbot). Narrows unknown → ExtractedInbound.
+ *           delivered directly by Meta. Narrows unknown → ExtractedInbound.
  *           Reference: Lynkbot @lynkbot/meta extractFirstMessage / isStatusUpdate.
  * Exports : isStatusUpdate(), extractInboundMessages()
  */

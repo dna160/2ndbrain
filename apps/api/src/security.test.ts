@@ -1,6 +1,6 @@
 /**
  * Phase 8 security authz matrix — every /v1 route rejects unauthenticated requests (401),
- * and the relay-HMAC + internal-API-key guards reject unsigned/unkeyed requests. Runs without a
+ * and the Meta-signature + internal-API-key guards reject unsigned/unkeyed requests. Runs without a
  * DB: the auth preHandlers reject before any handler touches the (stubbed) services.
  */
 import type { FastifyInstance } from 'fastify';
@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from './app';
 import { createAuthenticator } from './auth/authenticator';
 import type { Database } from './db/client';
-import { makeRelayHmacGuard } from './middleware/relayHmac';
+import { makeMetaSignatureGuard } from './middleware/metaSignature';
 import type { CalendarService } from './services/calendar.service';
 import type { ConversationsService } from './services/conversations.service';
 import type { DigestService } from './services/digest.service';
@@ -43,7 +43,8 @@ describe('security authz matrix', () => {
       pingRedis: async () => true,
       ingestion: {
         ingest: stub<IngestService>(),
-        relayGuard: makeRelayHmacGuard({ secret: 'relay-secret-at-least-16', maxSkewMs: 1000 }),
+        metaGuard: makeMetaSignatureGuard({ appSecret: 'da5cbd8dce8821884b190b2a344387ad' }),
+        metaVerifyToken: 'verify-token',
         resolveTenantId: async () => 't1',
         r2: { presignPut: async () => 'https://r2/put' },
         enqueuer: { enqueue: async () => undefined },
@@ -71,14 +72,43 @@ describe('security authz matrix', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('rejects an unsigned relay POST /ingest/wa with 401', async () => {
+  it('rejects an unsigned Meta webhook POST with 401', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/ingest/wa',
+      url: '/webhooks/meta',
       headers: { 'content-type': 'application/json' },
       payload: '{}',
     });
     expect(res.statusCode).toBe(401);
+  });
+
+  // Meta's GET handshake is how the callback URL gets registered at all: it must echo the
+  // raw challenge as text, and must not echo it for a wrong token.
+  it('echoes hub.challenge verbatim when the verify token matches', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/webhooks/meta?hub.mode=subscribe&hub.verify_token=verify-token&hub.challenge=1158201444',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('1158201444');
+    expect(res.headers['content-type']).toMatch(/text\/plain/);
+  });
+
+  it('rejects the handshake with a wrong verify token (403)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/webhooks/meta?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=123',
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.body).not.toContain('123');
+  });
+
+  it('rejects the handshake when hub.mode is not subscribe (403)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/webhooks/meta?hub.mode=unsubscribe&hub.verify_token=verify-token&hub.challenge=123',
+    });
+    expect(res.statusCode).toBe(403);
   });
 
   it('rejects /internal/dlq without the internal API key (401)', async () => {

@@ -49,12 +49,6 @@ function deps(cfg: { botActiveUntil?: Date | null; insertId?: string }, rec: Rec
         return { messageId: 'm1', delivery: 'sent' as const, windowOpen: true };
       }),
     },
-    takeover: {
-      pause: vi.fn(async () => {
-        calls.push('pause');
-      }),
-      resume: vi.fn(async () => undefined),
-    },
     now: () => NOW,
   };
 }
@@ -69,12 +63,15 @@ describe('ConversationsService.reply', () => {
     expect(d.waSend.send).not.toHaveBeenCalled();
   });
 
-  it('pauses the bot BEFORE sending when takeover is confirmed', async () => {
+  it('claims the thread locally before sending when takeover is confirmed', async () => {
+    // Recall owns the WABA directly now, so takeover is a local botActiveUntil write rather
+    // than a remote pause call — but it must still land before the message goes out.
     const rec: Rec = { updates: [], deletes: 0 };
     const calls: string[] = [];
     const d = deps({ botActiveUntil: new Date(NOW.getTime() + 3600_000), insertId: 'out1' }, rec, calls);
     const result = await new ConversationsService(d).reply('t1', '628a', 'hi', true);
-    expect(calls).toEqual(['pause', 'send']); // ordering is the contract
+    expect(rec.updates.length).toBeGreaterThan(0);
+    expect(calls).toEqual(['send']);
     expect(result.eventId).toBe('out1');
   });
 

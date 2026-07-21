@@ -70,10 +70,10 @@ DEEPSEEK_API_KEY=...      # structuring / consolidation / digest / brief
 EMBEDDINGS_API_KEY=...    # Cloudflare API token with Workers AI: Read
 EMBEDDINGS_URL=https://api.cloudflare.com/client/v4/accounts/<account id>/ai/run/@cf/baai/bge-m3
 
-LYNKBOT_RELAY_SECRET=<shared with Lynkbot, ≥16 chars>
-LYNKBOT_INTERNAL_URL=https://<lynkbot api base>
-META_ACCESS_TOKEN=...     # WhatsApp Cloud API
+META_ACCESS_TOKEN=...          # WhatsApp Cloud API
 META_PHONE_NUMBER_ID=...
+META_APP_SECRET=...            # verifies X-Hub-Signature-256 on inbound webhooks
+META_WEBHOOK_VERIFY_TOKEN=...  # echoed on Meta's GET handshake
 WA_UTILITY_TEMPLATE=daily_brief_ready
 ```
 
@@ -103,7 +103,9 @@ CLERK_SECRET_KEY=sk_live_...                    # server-side auth() at runtime
    web domain.
 5. Verify `GET https://<api>/internal/health` → `200 {"status":"ok","db":true,"redis":true}`.
 
-Then apply the two **Lynkbot PRs** (`docs/lynkbot-pr/`) so inbound WhatsApp relays to
-`https://<api>/ingest/wa`. Ports are automatic — the api binds `$PORT`, Next binds `$PORT`.
+Then point **Meta → WhatsApp → Configuration → Webhook** at
+`https://<api>/webhooks/meta`, using `META_WEBHOOK_VERIFY_TOKEN` as the Verify Token, and
+subscribe to the **messages** field. Meta calls GET once to verify, then POSTs every inbound
+message. Recall no longer depends on Lynkbot for ingest. Ports are automatic — the api binds `$PORT`, Next binds `$PORT`.
 
 See `docs/RUNBOOK.md` for rollback, migration policy, and the incident playbook.

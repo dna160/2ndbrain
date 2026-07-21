@@ -1,7 +1,7 @@
 # Recall
 
 A WhatsApp-native second brain for a strategic operator in Jakarta. Ingests WhatsApp
-messages/voice notes (via the Lynkbot WABA relay), audio uploads, and Google Calendar;
+messages/voice notes (direct from the Meta WABA webhook), audio uploads, and Google Calendar;
 produces Plaud-grade meeting notes, a three-tier graph memory, a nightly digest, and
 pre-meeting briefs — delivered back over WhatsApp.
 

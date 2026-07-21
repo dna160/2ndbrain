@@ -10,7 +10,7 @@ import { clerkVerify, resolveTenantFromDb } from './auth/clerk';
 import { loadConfig } from './config';
 import { createDb } from './db/client';
 import { tenants, users, waContacts } from './db/schema';
-import { makeRelayHmacGuard } from './middleware/relayHmac';
+import { makeMetaSignatureGuard } from './middleware/metaSignature';
 import { BullEnqueuer, createQueueStats, createRedisConnection } from './queues';
 import { CalendarService } from './services/calendar.service';
 import { ConversationsService } from './services/conversations.service';
@@ -19,7 +19,6 @@ import { GoogleApiCalendarClient } from './services/google/calendar.client';
 import { googleTokenProvider } from './services/google/token';
 import { IngestService } from './services/ingest.service';
 import { DeepSeekClient } from './services/llm/deepseek';
-import { LynkbotTakeoverClient } from './services/lynkbot.client';
 import { CloudflareEmbeddingsProvider } from './services/memory/embeddings';
 import { RetrievalService } from './services/memory/retrieval.service';
 import { GraphMetaSendClient } from './services/meta/send.client';
@@ -41,10 +40,7 @@ async function main(): Promise<void> {
     secretAccessKey: config.R2_SECRET_ACCESS_KEY,
     bucket: config.R2_BUCKET,
   });
-  const relayGuard = makeRelayHmacGuard({
-    secret: config.LYNKBOT_RELAY_SECRET,
-    maxSkewMs: config.RELAY_MAX_SKEW_MS,
-  });
+  const metaGuard = makeMetaSignatureGuard({ appSecret: config.META_APP_SECRET });
   const resolveTenantId = async (): Promise<string | null> => {
     const rows = await db
       .select({ id: tenants.id })
@@ -73,11 +69,7 @@ async function main(): Promise<void> {
     meta: new GraphMetaSendClient(config.META_ACCESS_TOKEN, config.META_PHONE_NUMBER_ID),
     templateName: config.WA_UTILITY_TEMPLATE,
   });
-  const conversations = new ConversationsService({
-    db,
-    waSend,
-    takeover: new LynkbotTakeoverClient(config.LYNKBOT_INTERNAL_URL, config.INTERNAL_API_KEY),
-  });
+  const conversations = new ConversationsService({ db, waSend });
   const calendar = new CalendarService({
     db,
     client: new GoogleApiCalendarClient(
@@ -105,7 +97,8 @@ async function main(): Promise<void> {
     logger: true,
     ingestion: {
       ingest,
-      relayGuard,
+      metaGuard,
+      metaVerifyToken: config.META_WEBHOOK_VERIFY_TOKEN,
       resolveTenantId,
       r2,
       enqueuer,

@@ -2,7 +2,7 @@
  * @CLAUDE_CONTEXT
  * Package : apps/api
  * File    : src/services/ingest.service.ts
- * Role    : Normalize a relayed Meta payload into `events` (idempotent on externalId),
+ * Role    : Normalize an inbound Meta webhook payload into `events` (idempotent on externalId),
  *           apply the blacklist gate (blocked sender → drop, persist nothing), and enqueue
  *           the `media` job / mark `persisted`. Adapted from Lynkbot routes/webhooks/meta.ts.
  * Exports : IngestService

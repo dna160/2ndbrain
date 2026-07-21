@@ -42,15 +42,15 @@ const ConfigSchema = z.object({
   /** Speaker diarization mode; 'pyannote' is scaffold-only and throws (docs/01 ADR-3). */
   DIARIZATION: z.enum(['none', 'pyannote']).default('none'),
 
-  // ── Lynkbot relay + WhatsApp send ────────────────────────────────────────
-  LYNKBOT_RELAY_SECRET: z.string().min(16), // Phase 2, required (HMAC secret)
-  LYNKBOT_INTERNAL_URL: z.string().url(), // Phase 5, required (takeover proxy)
-  META_ACCESS_TOKEN: z.string().min(1), // Phase 2, required (media fetch)
-  META_PHONE_NUMBER_ID: z.string().min(1), // Phase 5, required (outbound send)
+  // ── WhatsApp Cloud API (direct — Recall owns the WABA connection) ────────
+  META_ACCESS_TOKEN: z.string().min(1), // required (media fetch + outbound send)
+  META_PHONE_NUMBER_ID: z.string().min(1), // required (outbound send)
+  /** Meta App Secret — verifies the X-Hub-Signature-256 HMAC on inbound webhooks. */
+  META_APP_SECRET: z.string().min(1),
+  /** Shared token echoed back on Meta's GET webhook verification handshake. */
+  META_WEBHOOK_VERIFY_TOKEN: z.string().min(1),
   /** Approved utility template name for out-of-window sends (docs/00 F5). */
   WA_UTILITY_TEMPLATE: z.string().default('daily_brief_ready'),
-  /** Max relay clock skew for anti-replay (ms). */
-  RELAY_MAX_SKEW_MS: z.coerce.number().int().positive().default(300_000),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

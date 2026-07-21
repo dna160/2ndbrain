@@ -2,7 +2,8 @@
  * @CLAUDE_CONTEXT
  * Package : apps/api · File: src/services/conversations.service.ts
  * Role    : Full-inbox conversations (docs/00 F8) — thread aggregation, window-aware reply
- *           (takeover BEFORE send on bot-active threads), read receipts, and blacklist purge
+ *           (takeover is now a LOCAL flag — Recall owns the WABA directly, so there is no
+ *           external bot to pause), read receipts, and blacklist purge
  *           (the ONLY hard-delete path in the codebase — CLAUDE.md).
  * Exports : ConversationsService
  */
@@ -12,7 +13,6 @@ import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '../db/client';
 import { events, mediaAssets, waContacts } from '../db/schema';
-import type { TakeoverClient } from './lynkbot.client';
 import type { WaSendService } from './waSend.service';
 
 export interface ReplyResult {
@@ -25,7 +25,6 @@ export interface ReplyResult {
 export interface ConversationsDeps {
   db: Database;
   waSend: Pick<WaSendService, 'send'>;
-  takeover: TakeoverClient;
   now?: () => Date;
 }
 
@@ -107,7 +106,6 @@ export class ConversationsService {
       return { needsConfirm: true };
     }
     if (confirmTakeover) {
-      // Pause the bot FIRST, then send (docs/00 F8 takeover protocol).
       const until = new Date(this.now().getTime() + WA_WINDOW_HOURS * 3600 * 1000);
       await this.takeover(tenantId, waId, until);
     }
@@ -130,8 +128,8 @@ export class ConversationsService {
     return { eventId: rows[0]?.id, delivery: send.delivery, windowOpen: send.windowOpen };
   }
 
+  /** Marks the thread operator-owned until `until`. Local-only since Lynkbot was removed. */
   async takeover(tenantId: string, waId: string, until: Date): Promise<void> {
-    await this.deps.takeover.pause(waId, until.toISOString());
     await this.deps.db
       .update(waContacts)
       .set({ botActiveUntil: until, updatedAt: this.now() })
@@ -139,7 +137,6 @@ export class ConversationsService {
   }
 
   async resume(tenantId: string, waId: string): Promise<void> {
-    await this.deps.takeover.resume(waId);
     await this.deps.db
       .update(waContacts)
       .set({ botActiveUntil: null, updatedAt: this.now() })

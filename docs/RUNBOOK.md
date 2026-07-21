@@ -20,8 +20,8 @@ the `vector` extension) — Railway's default Postgres won't work.
    enforced fail-fast by `apps/api/src/config.ts` at boot.
 3. Configure Clerk: Google OAuth provider + Calendar scopes; copy keys.
 4. Register the Meta **utility template** `daily_brief_ready` (WA_UTILITY_TEMPLATE) in Business Manager.
-5. Apply the **Lynkbot PRs** (`docs/lynkbot-pr/phase-2-relay.md`, `phase-5-takeover.md`) so inbound
-   messages relay to `CORTEX_INGEST_URL=/ingest/wa` with the timestamp-bound HMAC.
+5. Point **Meta → WhatsApp → Configuration → Webhook** at `https://<api>/webhooks/meta` with
+   `META_WEBHOOK_VERIFY_TOKEN` as the Verify Token, and subscribe to the `messages` field.
 6. Deploy `api` first, run migrations: `pnpm --filter @recall/api db:migrate` (idempotent —
    `schema_migrations` tracking). Then `pnpm db:seed` (tenant + operator + own waId 'Operator').
 7. Deploy `worker` and `web`. Verify `/internal/health` → 200.
@@ -52,7 +52,7 @@ the `vector` extension) — Railway's default Postgres won't work.
 
 - **Transcription/structuring failing:** check `/internal/dlq` + the run's StageTimeline; verify
   `GROQ_API_KEY` / `DEEPSEEK_API_KEY`; retry the run.
-- **Nothing ingesting:** verify the Lynkbot relay is firing + `LYNKBOT_RELAY_SECRET` matches; a
+- **Nothing ingesting:** verify Meta's webhook is subscribed + `META_APP_SECRET` matches; a
   stale-timestamp 401 means clock skew > 5 min (`RELAY_MAX_SKEW_MS`).
 - **Digest/brief not delivered:** check `deliveredVia` (template = out of 24h window) + Meta token.
 - **Blacklist purge:** the only hard-delete path; `POST /v1/conversations/:waId/block {purgeHistory}`.

@@ -4,7 +4,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     /** Populated by the requireAuth preHandler on authenticated /v1 routes. */
     auth?: AuthContext;
-    /** Raw request body string, preserved for relay HMAC verification on /ingest/wa. */
+    /** Raw request body string, preserved for Meta X-Hub-Signature-256 verification. */
     rawBody?: string;
   }
 }

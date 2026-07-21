@@ -1,5 +1,5 @@
 /**
- * Contracts for the Lynkbot relay → /ingest/wa path (docs/00 F1, docs/01 §3.4).
+ * Contracts for the direct Meta webhook → /webhooks/meta path (docs/00 F1).
  * The raw Meta webhook body is loosely typed; extraction narrows it to ExtractedMessage.
  */
 import { z } from 'zod';
@@ -23,7 +23,7 @@ export const extractedMessageSchema = z.object({
 });
 export type ExtractedMessage = z.infer<typeof extractedMessageSchema>;
 
-/** Response of POST /ingest/wa — a per-payload ingestion summary. */
+/** Response of POST /webhooks/meta — a per-payload ingestion summary. */
 export const ingestResponseSchema = z.object({
   received: z.literal(true),
   persisted: z.number().int().nonnegative(),

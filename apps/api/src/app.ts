@@ -8,8 +8,8 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { Authenticate } from './auth/authenticator';
 import { makeRequireAuth } from './auth/requireAuth';
 import type { Database } from './db/client';
-import type { RelayGuard } from './middleware/relayHmac';
-import { registerIngestRoutes } from './routes/ingest/wa';
+import type { MetaSignatureGuard } from './middleware/metaSignature';
+import { registerMetaWebhookRoutes } from './routes/webhooks/meta';
 import { registerDlqRoutes } from './routes/internal/dlq';
 import { registerHealthRoutes } from './routes/internal/health';
 import { registerCalendarRoutes } from './routes/v1/calendar';
@@ -35,7 +35,9 @@ import { SpeakerService } from './services/speaker.service';
 /** Phase 2 ingestion wiring — optional so Phase 1 tests can build a minimal app. */
 export interface IngestionDeps {
   ingest: IngestService;
-  relayGuard: RelayGuard;
+  metaGuard: MetaSignatureGuard;
+  /** Token echoed on Meta's GET webhook handshake (META_WEBHOOK_VERIFY_TOKEN). */
+  metaVerifyToken: string;
   resolveTenantId: () => Promise<string | null>;
   r2: Pick<R2Client, 'presignPut'>;
   enqueuer: Pick<Enqueuer, 'enqueue'>;
@@ -58,7 +60,7 @@ export interface BuildAppDeps {
 export function buildApp(deps: BuildAppDeps): FastifyInstance {
   const app = Fastify({ logger: deps.logger ?? false });
 
-  // Preserve the raw JSON body so the relay HMAC can verify the exact bytes (docs/01 §3.4).
+  // Preserve the raw JSON body so Meta's X-Hub-Signature-256 verifies the exact bytes.
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
     const raw = typeof body === 'string' ? body : body.toString('utf8');
     request.rawBody = raw;
@@ -84,9 +86,10 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
 
   if (deps.ingestion) {
     const ing = deps.ingestion;
-    registerIngestRoutes(app, {
+    registerMetaWebhookRoutes(app, {
       ingest: ing.ingest,
-      relayGuard: ing.relayGuard,
+      metaGuard: ing.metaGuard,
+      verifyToken: ing.metaVerifyToken,
       resolveTenantId: ing.resolveTenantId,
     });
     registerDlqRoutes(app, { db: deps.db, internalApiKey: ing.internalApiKey });

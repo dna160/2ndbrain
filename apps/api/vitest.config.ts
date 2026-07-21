@@ -17,7 +17,7 @@ export default defineConfig({
         'src/config.ts',
         'src/auth/authenticator.ts',
         'src/middleware/internalApiKey.ts',
-        'src/middleware/relayHmac.ts',
+        'src/middleware/metaSignature.ts',
         'src/services/pipeline.service.ts',
         'src/services/ingest.service.ts',
         'src/services/media.service.ts',
@@ -49,7 +49,7 @@ export default defineConfig({
         '**/services/meta/extract.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/services/llm/parse.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/auth/authenticator.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
-        '**/middleware/relayHmac.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
+        '**/middleware/metaSignature.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/services/waSend.service.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/services/memory/math.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         '**/middleware/internalApiKey.ts': {

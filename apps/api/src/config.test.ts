@@ -12,11 +12,11 @@ const validEnv = {
   R2_ACCESS_KEY_ID: 'key',
   R2_SECRET_ACCESS_KEY: 'secret',
   R2_BUCKET: 'recall-media',
-  LYNKBOT_RELAY_SECRET: 'relay-secret-at-least-16',
+  META_APP_SECRET: 'da5cbd8dce8821884b190b2a344387ad',
   META_ACCESS_TOKEN: 'meta-token',
   GROQ_API_KEY: 'groq-key',
   DEEPSEEK_API_KEY: 'deepseek-key',
-  LYNKBOT_INTERNAL_URL: 'http://lynkbot.internal',
+  META_WEBHOOK_VERIFY_TOKEN: 'verify-token',
   META_PHONE_NUMBER_ID: 'pn-1',
   EMBEDDINGS_API_KEY: 'embed-key',
 } satisfies NodeJS.ProcessEnv;

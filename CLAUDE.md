@@ -1,7 +1,7 @@
 # CLAUDE.md — Recall Build Operating Manual
 
 You are building **Recall**: a WhatsApp-native second brain for a strategic operator in Jakarta.
-It ingests WhatsApp messages/voice notes (relayed from the Lynkbot WABA), audio uploads (Plaud
+It ingests WhatsApp messages/voice notes (directly from the Meta WABA webhook), audio uploads (Plaud
 recordings), and Google Calendar events; produces Plaud-grade meeting notes (topic-segmented,
 timestamped, speaker-attributed, with per-participant AI recommendations); maintains a
 three-tier graph memory; and delivers a nightly digest + pre-meeting briefs back over WhatsApp.
@@ -59,7 +59,7 @@ pnpm build            # all workspaces build clean
   auth guards, cost metering, and memory-write paths.**
 - Every endpoint has a supertest contract test against its zod schema.
 - Every queue worker has a test covering: success, retryable failure, poison message → DLQ.
-- Golden fixtures in `fixtures/`: sample Meta relay payload, 2 short audio files (ID + mixed
+- Golden fixtures in `fixtures/`: sample Meta webhook payload, 2 short audio files (ID + mixed
   ID/EN), expected structuring output. Structuring changes must keep golden tests green or
   update goldens with justification in the phase DONE file.
 - No phase closes with a failing CI pipeline.
@@ -67,11 +67,12 @@ pnpm build            # all workspaces build clean
 ## Environment keys (registry in 01-ARCHITECTURE §8; never hardcode)
 
 DATABASE_URL, REDIS_URL, CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, R2_* (account, key, secret,
-bucket), GROQ_API_KEY, DEEPSEEK_API_KEY, EMBEDDINGS_API_KEY, LYNKBOT_RELAY_SECRET,
-LYNKBOT_INTERNAL_URL (takeover endpoint), META_ACCESS_TOKEN, META_PHONE_NUMBER_ID,
+bucket), GROQ_API_KEY, DEEPSEEK_API_KEY, EMBEDDINGS_API_KEY, EMBEDDINGS_URL,
+META_ACCESS_TOKEN, META_PHONE_NUMBER_ID, META_APP_SECRET, META_WEBHOOK_VERIFY_TOKEN,
 INTERNAL_API_KEY, APP_URL.
 
-Capture model: **default-capture, blacklist-to-exclude.** All WABA inbound is relayed and
+Capture model: **default-capture, blacklist-to-exclude.** Recall receives WhatsApp webhooks
+**directly from Meta** at `POST /webhooks/meta` (no Lynkbot relay). All inbound is
 persisted unless the sender is blocked in `waContacts`; blocked = dropped at ingest, never
 stored. The blacklist exists only in Recall. Blacklist purge is the ONLY permitted
 hard-delete path in the codebase.
