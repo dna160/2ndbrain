@@ -1,5 +1,5 @@
 {
-  "id": "618fc150-6f69-491b-9903-47a71882ea82",
+  "id": "d1538ba5-9c3c-4d75-8f61-529cfdb740ac",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2406,7 +2406,183 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.calendar_draft_action": {
+      "name": "calendar_draft_action",
+      "schema": "public",
+      "values": [
+        "create",
+        "update",
+        "cancel"
+      ]
+    },
+    "public.calendar_draft_source": {
+      "name": "calendar_draft_source",
+      "schema": "public",
+      "values": [
+        "digest",
+        "meeting",
+        "manual"
+      ]
+    },
+    "public.calendar_draft_status": {
+      "name": "calendar_draft_status",
+      "schema": "public",
+      "values": [
+        "proposed",
+        "confirmed",
+        "rejected"
+      ]
+    },
+    "public.diarization_mode": {
+      "name": "diarization_mode",
+      "schema": "public",
+      "values": [
+        "none",
+        "llm",
+        "pyannote"
+      ]
+    },
+    "public.digest_delivered_via": {
+      "name": "digest_delivered_via",
+      "schema": "public",
+      "values": [
+        "freeform",
+        "template",
+        "none"
+      ]
+    },
+    "public.entity_kind": {
+      "name": "entity_kind",
+      "schema": "public",
+      "values": [
+        "person",
+        "org",
+        "venture",
+        "project",
+        "topic"
+      ]
+    },
+    "public.event_direction": {
+      "name": "event_direction",
+      "schema": "public",
+      "values": [
+        "inbound",
+        "outbound",
+        "system"
+      ]
+    },
+    "public.event_source": {
+      "name": "event_source",
+      "schema": "public",
+      "values": [
+        "wa",
+        "gcal",
+        "upload",
+        "system"
+      ]
+    },
+    "public.event_type": {
+      "name": "event_type",
+      "schema": "public",
+      "values": [
+        "message",
+        "audio",
+        "image",
+        "document",
+        "calendar",
+        "note"
+      ]
+    },
+    "public.memory_review_reason": {
+      "name": "memory_review_reason",
+      "schema": "public",
+      "values": [
+        "low_confidence",
+        "contradiction",
+        "t3_nomination"
+      ]
+    },
+    "public.memory_review_resolution": {
+      "name": "memory_review_resolution",
+      "schema": "public",
+      "values": [
+        "approved",
+        "edited",
+        "rejected"
+      ]
+    },
+    "public.memory_status": {
+      "name": "memory_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "review",
+        "archived"
+      ]
+    },
+    "public.pipeline_status": {
+      "name": "pipeline_status",
+      "schema": "public",
+      "values": [
+        "running",
+        "done",
+        "failed",
+        "dead"
+      ]
+    },
+    "public.relation_type": {
+      "name": "relation_type",
+      "schema": "public",
+      "values": [
+        "works_at",
+        "founder_of",
+        "partner_in",
+        "invested_in",
+        "advises",
+        "client_of",
+        "supplier_of",
+        "member_of",
+        "blocks",
+        "related_to"
+      ]
+    },
+    "public.sensitivity": {
+      "name": "sensitivity",
+      "schema": "public",
+      "values": [
+        "normal",
+        "sensitive"
+      ]
+    },
+    "public.task_status": {
+      "name": "task_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "done",
+        "dropped"
+      ]
+    },
+    "public.transcript_status": {
+      "name": "transcript_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "processing",
+        "done",
+        "failed"
+      ]
+    },
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "owner",
+        "member"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

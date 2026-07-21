@@ -24,6 +24,11 @@ export async function runMigrations(
 ): Promise<void> {
   const sql = postgres(databaseUrl, { max: 1 });
   try {
+    // pgvector must exist before any migration declares `vector(1024)`. This lives here, not
+    // in the .sql, because drizzle-kit does not emit CREATE EXTENSION — a regenerated
+    // migration silently drops it (which is how the enum DDL was lost). Idempotent.
+    await sql`CREATE EXTENSION IF NOT EXISTS vector`;
+
     // Tracking table — mirrors the Lynkbot runner.
     await sql`
       CREATE TABLE IF NOT EXISTS ${sql(MIGRATIONS_TABLE)} (

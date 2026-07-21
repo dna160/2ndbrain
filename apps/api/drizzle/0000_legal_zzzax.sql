@@ -1,4 +1,21 @@
-CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
+CREATE TYPE "public"."calendar_draft_action" AS ENUM('create', 'update', 'cancel');--> statement-breakpoint
+CREATE TYPE "public"."calendar_draft_source" AS ENUM('digest', 'meeting', 'manual');--> statement-breakpoint
+CREATE TYPE "public"."calendar_draft_status" AS ENUM('proposed', 'confirmed', 'rejected');--> statement-breakpoint
+CREATE TYPE "public"."diarization_mode" AS ENUM('none', 'llm', 'pyannote');--> statement-breakpoint
+CREATE TYPE "public"."digest_delivered_via" AS ENUM('freeform', 'template', 'none');--> statement-breakpoint
+CREATE TYPE "public"."entity_kind" AS ENUM('person', 'org', 'venture', 'project', 'topic');--> statement-breakpoint
+CREATE TYPE "public"."event_direction" AS ENUM('inbound', 'outbound', 'system');--> statement-breakpoint
+CREATE TYPE "public"."event_source" AS ENUM('wa', 'gcal', 'upload', 'system');--> statement-breakpoint
+CREATE TYPE "public"."event_type" AS ENUM('message', 'audio', 'image', 'document', 'calendar', 'note');--> statement-breakpoint
+CREATE TYPE "public"."memory_review_reason" AS ENUM('low_confidence', 'contradiction', 't3_nomination');--> statement-breakpoint
+CREATE TYPE "public"."memory_review_resolution" AS ENUM('approved', 'edited', 'rejected');--> statement-breakpoint
+CREATE TYPE "public"."memory_status" AS ENUM('active', 'review', 'archived');--> statement-breakpoint
+CREATE TYPE "public"."pipeline_status" AS ENUM('running', 'done', 'failed', 'dead');--> statement-breakpoint
+CREATE TYPE "public"."relation_type" AS ENUM('works_at', 'founder_of', 'partner_in', 'invested_in', 'advises', 'client_of', 'supplier_of', 'member_of', 'blocks', 'related_to');--> statement-breakpoint
+CREATE TYPE "public"."sensitivity" AS ENUM('normal', 'sensitive');--> statement-breakpoint
+CREATE TYPE "public"."task_status" AS ENUM('open', 'done', 'dropped');--> statement-breakpoint
+CREATE TYPE "public"."transcript_status" AS ENUM('pending', 'processing', 'done', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."user_role" AS ENUM('owner', 'member');--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "connected_accounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid NOT NULL,
