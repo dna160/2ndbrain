@@ -11,10 +11,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@clerk/nextjs": "5.7.5",
+    "@clerk/nextjs": "5.7.6",
     "@recall/shared": "workspace:*",
     "@tanstack/react-query": "5.62.7",
-    "next": "14.2.18",
+    "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "3.23.8"
