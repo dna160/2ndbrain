@@ -67,8 +67,8 @@ R2_ACCOUNT_ID=...  R2_ACCESS_KEY_ID=...  R2_SECRET_ACCESS_KEY=...  R2_BUCKET=rec
 
 GROQ_API_KEY=...          # Whisper STT
 DEEPSEEK_API_KEY=...      # structuring / consolidation / digest / brief
-EMBEDDINGS_API_KEY=...    # BGE-M3
-EMBEDDINGS_URL=https://<your BGE-M3 / TEI endpoint>/embed
+EMBEDDINGS_API_KEY=...    # Cloudflare API token with Workers AI: Read
+EMBEDDINGS_URL=https://api.cloudflare.com/client/v4/accounts/<account id>/ai/run/@cf/baai/bge-m3
 
 LYNKBOT_RELAY_SECRET=<shared with Lynkbot, ≥16 chars>
 LYNKBOT_INTERNAL_URL=https://<lynkbot api base>

@@ -20,7 +20,7 @@ import { googleTokenProvider } from './services/google/token';
 import { IngestService } from './services/ingest.service';
 import { DeepSeekClient } from './services/llm/deepseek';
 import { LynkbotTakeoverClient } from './services/lynkbot.client';
-import { Bge3EmbeddingsProvider } from './services/memory/embeddings';
+import { CloudflareEmbeddingsProvider } from './services/memory/embeddings';
 import { RetrievalService } from './services/memory/retrieval.service';
 import { GraphMetaSendClient } from './services/meta/send.client';
 import { PipelineService } from './services/pipeline.service';
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
     retrieval: new RetrievalService({
       db,
-      embeddings: new Bge3EmbeddingsProvider(config.EMBEDDINGS_API_KEY, config.EMBEDDINGS_URL),
+      embeddings: new CloudflareEmbeddingsProvider(config.EMBEDDINGS_API_KEY, config.EMBEDDINGS_URL),
     }),
     waSend,
     calendar,

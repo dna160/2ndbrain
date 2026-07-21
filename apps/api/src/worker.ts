@@ -18,7 +18,7 @@ import { DigestService } from './services/digest.service';
 import { DeepSeekClient } from './services/llm/deepseek';
 import { MediaService } from './services/media.service';
 import { ConsolidationService } from './services/memory/consolidation.service';
-import { Bge3EmbeddingsProvider } from './services/memory/embeddings';
+import { CloudflareEmbeddingsProvider } from './services/memory/embeddings';
 import { GraphService } from './services/memory/graph.service';
 import { RetrievalService } from './services/memory/retrieval.service';
 import { GraphMetaMediaClient } from './services/meta/media.client';
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     pipeline,
   });
   // ── Memory (Phase 6): embeddings + graph + retrieval + consolidation ────────
-  const embeddings = new Bge3EmbeddingsProvider(config.EMBEDDINGS_API_KEY, config.EMBEDDINGS_URL);
+  const embeddings = new CloudflareEmbeddingsProvider(config.EMBEDDINGS_API_KEY, config.EMBEDDINGS_URL);
   const graph = new GraphService(db);
   const retrieval = new RetrievalService({ db, embeddings });
   const consolidation = new ConsolidationService({
