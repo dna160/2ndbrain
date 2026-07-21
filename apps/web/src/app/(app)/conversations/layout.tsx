@@ -35,7 +35,7 @@ export default function ConversationsLayout({ children }: { children: ReactNode 
               onClick={() => router.push(`/conversations/${t.waId}`)}
             >
               <div className="row-primary" style={{ display: 'flex', gap: 'var(--s2)', alignItems: 'center' }}>
-                <span className={t.unreadCount > 0 ? 'unread' : undefined}>{t.label ?? t.waId}</span>
+                <span className={t.unreadCount > 0 ? 'unread' : undefined}>{t.label ?? t.profileName ?? t.waId}</span>
                 {t.botActive && <Chip tone="accent">Bot active</Chip>}
               </div>
               <div className="row-meta" style={{ display: 'flex', gap: 'var(--s2)', alignItems: 'center' }}>

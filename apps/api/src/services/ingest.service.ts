@@ -45,7 +45,7 @@ export class IngestService {
         this.deps.recordDrop?.(message.senderWaId);
         continue; // blacklist: persist nothing (CLAUDE.md)
       }
-      await this.touchContact(tenantId, message.senderWaId);
+      await this.touchContact(tenantId, message.senderWaId, message.senderName);
 
       const eventId = await this.insertEvent(tenantId, message);
       if (!eventId) {
@@ -73,10 +73,18 @@ export class IngestService {
     return rows[0]?.blocked ?? false;
   }
 
-  private async touchContact(tenantId: string, waId: string): Promise<void> {
+  /**
+   * Refresh last-seen and the WhatsApp profile name. `profileName` is overwritten every time
+   * because the sender can rename themselves; the operator's own `label` is never touched.
+   */
+  private async touchContact(tenantId: string, waId: string, senderName: string | null): Promise<void> {
     await this.deps.db
       .update(waContacts)
-      .set({ lastInboundAt: this.now(), updatedAt: this.now() })
+      .set({
+        lastInboundAt: this.now(),
+        updatedAt: this.now(),
+        ...(senderName ? { profileName: senderName } : {}),
+      })
       .where(and(eq(waContacts.tenantId, tenantId), eq(waContacts.waId, waId)));
   }
 

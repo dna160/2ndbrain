@@ -6,7 +6,10 @@ export type ConversationFilter = z.infer<typeof conversationFilterSchema>;
 
 export const threadSchema = z.object({
   waId: z.string(),
+  /** Operator-assigned name; wins over profileName for display. */
   label: z.string().nullable(),
+  /** WhatsApp profile name as sent by Meta. */
+  profileName: z.string().nullable(),
   lastMessage: z.string().nullable(),
   lastAt: z.string().datetime().nullable(),
   unreadCount: z.number().int().nonnegative(),

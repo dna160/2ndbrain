@@ -1,0 +1,1 @@
+ALTER TABLE "wa_contacts" ADD COLUMN "profile_name" text;

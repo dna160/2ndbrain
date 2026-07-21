@@ -11,6 +11,20 @@ import type { ExtractedMessage, IngestEventType } from '@recall/shared';
 
 export interface ExtractedInbound extends ExtractedMessage {
   raw: Record<string, unknown>;
+  /** WhatsApp profile name from `value.contacts[].profile.name`, when the sender shares it. */
+  senderName: string | null;
+}
+
+/** wa_id → profile name for one change value. Meta sends contacts alongside messages. */
+function contactNames(value: Record<string, unknown>): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const rawContact of asArray(value.contacts)) {
+    const contact = asRecord(rawContact);
+    const waId = asString(contact?.wa_id);
+    const name = asString(asRecord(contact?.profile)?.name);
+    if (waId && name) names.set(waId, name);
+  }
+  return names;
 }
 
 function asRecord(v: unknown): Record<string, unknown> | undefined {
@@ -68,6 +82,7 @@ export function extractInboundMessages(body: unknown): ExtractedInbound[] {
   const out: ExtractedInbound[] = [];
   for (const value of changeValues(body)) {
     const phoneNumberId = asString(asRecord(value.metadata)?.phone_number_id);
+    const names = contactNames(value);
     for (const rawMsg of asArray(value.messages)) {
       const msg = asRecord(rawMsg);
       if (!msg) continue;
@@ -97,6 +112,7 @@ export function extractInboundMessages(body: unknown): ExtractedInbound[] {
         mime: typeObj ? asString(typeObj.mime_type) : null,
         occurredAt,
         raw: msg,
+        senderName: names.get(senderWaId) ?? null,
       });
     }
   }

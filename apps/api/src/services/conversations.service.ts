@@ -70,6 +70,7 @@ export class ConversationsService {
       threads.push({
         waId: row.waId,
         label: contact.label,
+        profileName: contact.profileName,
         lastMessage: last?.content ?? null,
         lastAt: row.lastAt ? new Date(row.lastAt).toISOString() : null,
         unreadCount: Number(row.unread),

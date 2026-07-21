@@ -39,7 +39,11 @@ export const waContacts = pgTable(
     id: idColumn(),
     tenantId: tenantIdColumn(),
     waId: text('wa_id').notNull(),
+    /** Operator-assigned name (PATCH /v1/settings/contacts/:waId). Always wins for display. */
     label: text('label'),
+    /** WhatsApp profile name from the webhook's contacts[].profile.name. Refreshed on every
+     *  inbound because the sender can change it; never overwrites `label`. */
+    profileName: text('profile_name'),
     blocked: boolean('blocked').notNull().default(false),
     botActiveUntil: timestamp('bot_active_until', { withTimezone: true }),
     lastInboundAt: timestamp('last_inbound_at', { withTimezone: true }),

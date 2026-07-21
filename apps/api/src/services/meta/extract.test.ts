@@ -101,3 +101,47 @@ describe('extractInboundMessages', () => {
     expect(out[0]).toMatchObject({ eventType: 'message', rawType: 'unknown', phoneNumberId: null, mediaId: null });
   });
 });
+
+describe('sender profile names', () => {
+  function wrapWithContacts(messages: unknown[], contacts: unknown[]) {
+    return {
+      entry: [
+        { changes: [{ value: { metadata: { phone_number_id: 'PN1' }, contacts, messages } }] },
+      ],
+    };
+  }
+
+  it('pairs each message with its sender profile name by wa_id', () => {
+    const out = extractInboundMessages(
+      wrapWithContacts(
+        [textMsg, audioMsg],
+        [
+          { wa_id: '628a', profile: { name: 'Budi Santoso' } },
+          { wa_id: '628b', profile: { name: 'Sarah Chen' } },
+        ],
+      ),
+    );
+    expect(out.map((m) => [m.senderWaId, m.senderName])).toEqual([
+      ['628a', 'Budi Santoso'],
+      ['628b', 'Sarah Chen'],
+    ]);
+  });
+
+  it('is null when the sender has no matching contact entry', () => {
+    const out = extractInboundMessages(
+      wrapWithContacts([textMsg], [{ wa_id: 'someone-else', profile: { name: 'Nope' } }]),
+    );
+    expect(out[0]?.senderName).toBeNull();
+  });
+
+  it('is null when contacts are absent entirely', () => {
+    expect(extractInboundMessages(wrap([textMsg]))[0]?.senderName).toBeNull();
+  });
+
+  it('tolerates a malformed contact entry without throwing', () => {
+    const out = extractInboundMessages(
+      wrapWithContacts([textMsg], [{ wa_id: '628a' }, null, { profile: { name: 'no wa_id' } }]),
+    );
+    expect(out[0]?.senderName).toBeNull();
+  });
+});
