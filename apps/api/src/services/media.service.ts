@@ -47,6 +47,16 @@ export class MediaService {
     return this.deps.pipeline.stage(job.runId, 'media_stored', async () => {
       const meta = await this.deps.meta.getMediaMeta(job.mediaId);
       const bytes = await this.deps.meta.download(meta.url);
+
+      // Meta tells us the exact size; a short read otherwise flows silently into Whisper and
+      // surfaces as "the transcript is nonsense" rather than as a download failure. Throwing
+      // here lets BullMQ retry the fetch, which is the actual remedy.
+      if (meta.fileSize > 0 && bytes.length !== meta.fileSize) {
+        throw new Error(
+          `media ${job.mediaId} truncated: got ${bytes.length} bytes, expected ${meta.fileSize}`,
+        );
+      }
+
       const sha256 = createHash('sha256').update(bytes).digest('hex');
 
       const existing = await this.deps.db

@@ -75,4 +75,21 @@ describe('MediaService.fetchAndStore', () => {
     const deps = makeDeps({ dedupeHit: null, insertId: null, mimeType: 'audio/ogg' });
     await expect(new MediaService(deps).fetchAndStore(job)).rejects.toThrow(/no id/);
   });
+
+  it('rejects a truncated download instead of storing it', async () => {
+    // A short read would otherwise reach Whisper and look like bad transcription quality
+    // rather than a failed fetch. Throwing lets BullMQ retry, which is the real remedy.
+    const deps = makeDeps({ dedupeHit: null, insertId: 'ma3', mimeType: 'audio/ogg' });
+    deps.meta.download = vi.fn(async () => new Uint8Array([1, 2])); // meta declares 3 bytes
+    await expect(new MediaService(deps).fetchAndStore(job)).rejects.toThrow(
+      /truncated: got 2 bytes, expected 3/,
+    );
+    expect(deps.put).not.toHaveBeenCalled();
+  });
+
+  it('skips the size check when Meta reports no file_size', async () => {
+    const deps = makeDeps({ dedupeHit: null, insertId: 'ma4', mimeType: 'audio/ogg' });
+    deps.meta.getMediaMeta = vi.fn(async () => ({ url: 'https://m/x', mimeType: 'audio/ogg', fileSize: 0 }));
+    await expect(new MediaService(deps).fetchAndStore(job)).resolves.toEqual({ mediaAssetId: 'ma4' });
+  });
 });
