@@ -16,9 +16,12 @@ COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
 # NEXT_PUBLIC_* must be present as an ENV at build time so Next inlines it into the bundle.
-# On Railway: add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY as a service variable (it is passed to the build).
+# On Railway: add these as service variables (Railway passes them to the build). Changing
+# either one requires a rebuild — a restart alone will not update the client bundle.
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter @recall/web build
 
 FROM build AS runtime
