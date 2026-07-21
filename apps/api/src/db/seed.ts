@@ -48,10 +48,24 @@ export async function seed(databaseUrl: string, opts: {
 const invokedDirectly = process.argv[1] === fileURLToPath(import.meta.url);
 if (invokedDirectly) {
   const config = loadConfig();
+  const clerkUserId = process.env.SEED_CLERK_USER_ID;
+  const operatorWaId = process.env.SEED_OPERATOR_WAID;
+
+  // No placeholder fallbacks: the seeded 'Operator' contact becomes the nightly digest's
+  // recipient, so a dummy waId would send the operator's briefs to whoever owns that number.
+  // This runs on every deploy via preDeployCommand — skip (exit 0) rather than fail the
+  // deploy or write junk when the values are not configured yet.
+  if (!clerkUserId || !operatorWaId) {
+    console.warn(
+      '[seed] skipped — set SEED_CLERK_USER_ID and SEED_OPERATOR_WAID to provision the tenant.',
+    );
+    process.exit(0);
+  }
+
   seed(config.DATABASE_URL, {
     tenantName: process.env.SEED_TENANT_NAME ?? 'Operator Tenant',
-    clerkUserId: process.env.SEED_CLERK_USER_ID ?? 'user_seed_operator',
-    operatorWaId: process.env.SEED_OPERATOR_WAID ?? '000000000000',
+    clerkUserId,
+    operatorWaId,
   })
     .then(({ tenantId }) => {
       console.log(`[seed] ok — tenant ${tenantId}`);

@@ -95,10 +95,11 @@ CLERK_SECRET_KEY=sk_live_...                    # server-side auth() at runtime
    (`db:migrate`) before the new release goes live — they are idempotent, so every deploy
    re-runs them harmlessly. Deploy api BEFORE worker: the worker reads `waContacts` at boot
    and crash-loops with `relation "wa_contacts" does not exist` against an unmigrated DB.
-3. Seed once, manually, from the api service shell — it is NOT automated because the defaults
-   are placeholders (`user_seed_operator` / waId `000000000000`) and a bogus Operator contact
-   would become the digest recipient:
-   `SEED_CLERK_USER_ID=<real> SEED_OPERATOR_WAID=<real> pnpm --filter @recall/api db:seed`
+3. Seeding also runs in `preDeployCommand` (idempotent), but only when **both**
+   `SEED_CLERK_USER_ID` and `SEED_OPERATOR_WAID` are set as service variables. With either
+   missing it logs a warning and exits 0 rather than writing a placeholder — the seeded
+   `Operator` contact is the nightly digest's recipient, so a dummy waId would send the
+   operator's briefs to whoever owns that number.
 4. Deploy **recall-worker** and **recall-web**. Generate domains for api + web; set `APP_URL` to the
    web domain.
 5. Verify `GET https://<api>/internal/health` → `200 {"status":"ok","db":true,"redis":true}`.
