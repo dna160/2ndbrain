@@ -19,6 +19,8 @@ const ConfigSchema = z.object({
   APP_URL: z.string().url({ message: 'must be a valid URL (e.g. http://localhost:3000)' }),
   INTERNAL_API_KEY: z.string().min(16, 'must be at least 16 characters'),
   TZ_DISPLAY: z.string().min(1).default('Asia/Jakarta'),
+  /** Extra browser origins allowed to call /v1, comma-separated. APP_URL is always allowed. */
+  CORS_ORIGIN: z.string().optional(),
 
   // ── Datastores (Phase 1, required) ───────────────────────────────────────
   DATABASE_URL: z.string().url(),

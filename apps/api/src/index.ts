@@ -94,6 +94,11 @@ async function main(): Promise<void> {
     db,
     authenticate,
     pingRedis: async () => (await connection.ping()) === 'PONG',
+    cors: {
+      appUrl: config.APP_URL,
+      isProduction: config.NODE_ENV === 'production',
+      extra: config.CORS_ORIGIN,
+    },
     logger: true,
     ingestion: {
       ingest,

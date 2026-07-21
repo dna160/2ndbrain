@@ -9,6 +9,7 @@ import type { Authenticate } from './auth/authenticator';
 import { makeRequireAuth } from './auth/requireAuth';
 import type { Database } from './db/client';
 import type { MetaSignatureGuard } from './middleware/metaSignature';
+import { registerCors } from './plugins/cors';
 import { registerMetaWebhookRoutes } from './routes/webhooks/meta';
 import { registerDlqRoutes } from './routes/internal/dlq';
 import { registerHealthRoutes } from './routes/internal/health';
@@ -53,12 +54,18 @@ export interface BuildAppDeps {
   pingDb?: () => Promise<boolean>;
   logger?: boolean;
   ingestion?: IngestionDeps;
+  /** Browser origin allowed to call /v1 (the web service). Omit to skip CORS entirely. */
+  cors?: { appUrl: string; isProduction: boolean; extra?: string };
   calendarConversations?: { calendar: CalendarService; conversations: ConversationsService };
   digest?: DigestService;
 }
 
 export function buildApp(deps: BuildAppDeps): FastifyInstance {
   const app = Fastify({ logger: deps.logger ?? false });
+
+  // Must register before routes: api and web are different origins, so every browser call
+  // to /v1 preflights and 404s without this.
+  if (deps.cors) registerCors(app, deps.cors);
 
   // Preserve the raw JSON body so Meta's X-Hub-Signature-256 verifies the exact bytes.
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
