@@ -14,6 +14,7 @@
     "@clerk/nextjs": "5.7.6",
     "@recall/shared": "workspace:*",
     "@tanstack/react-query": "5.62.7",
+    "lucide-react": "1.25.0",
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
