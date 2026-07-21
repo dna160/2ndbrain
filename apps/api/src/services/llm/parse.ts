@@ -8,7 +8,7 @@
  *           routes/v1/ai.ts fence-rescue parser.
  * Exports : parseStructured(), extractJson()
  */
-import type { ZodType } from 'zod';
+import type { ZodType, ZodTypeDef } from 'zod';
 
 import type { ChatMessage, LlmClient, LlmUsage } from './types';
 
@@ -21,7 +21,7 @@ export function extractJson(raw: string): string {
 
 type ParseAttempt<T> = { ok: true; data: T } | { ok: false; error: string };
 
-function tryParse<T>(schema: ZodType<T>, content: string): ParseAttempt<T> {
+function tryParse<T>(schema: ZodType<T, ZodTypeDef, unknown>, content: string): ParseAttempt<T> {
   let json: unknown;
   try {
     json = JSON.parse(extractJson(content));
@@ -36,7 +36,9 @@ function tryParse<T>(schema: ZodType<T>, content: string): ParseAttempt<T> {
 }
 
 export interface StructuredRequest<T> {
-  schema: ZodType<T>;
+  /** Input is `unknown`: LLM JSON is arbitrary, and shape-normalizing transforms mean
+   *  a schema's input and output types legitimately differ. */
+  schema: ZodType<T, ZodTypeDef, unknown>;
   system: string;
   user: string;
   model: string;

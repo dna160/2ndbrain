@@ -78,8 +78,15 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   const digestWorker = new Worker(
     QUEUES.digest,
     async () => {
+      // The nightly digest is the product's headline output, and it previously logged nothing
+      // on either success or failure — a failed run was indistinguishable from one that never
+      // fired, and only surfaced by reading the DLQ.
       const rows = await deps.db.select({ id: tenants.id }).from(tenants);
-      for (const t of rows) await deps.digest.run(t.id);
+      console.log(`[digest] nightly run starting for ${rows.length} tenant(s)`);
+      for (const t of rows) {
+        await deps.digest.run(t.id);
+        console.log(`[digest] tenant ${t.id} done`);
+      }
     },
     { connection: deps.connection },
   );
