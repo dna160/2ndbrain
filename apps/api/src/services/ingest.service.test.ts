@@ -7,8 +7,11 @@ import { IngestService, type IngestDeps } from './ingest.service';
 
 // Fake drizzle handle: chain methods return the same thenable; insert(events) resolves the
 // configured event-insert result, select resolves the blocked flag.
-function makeIngestDb(cfg: { blocked: boolean; eventInsertId: string | null }): Database {
-  const make = (result: unknown[]) => {
+function makeIngestDb(
+  cfg: { blocked: boolean; eventInsertId: string | null },
+  onUpdateSet?: (payload: unknown) => void,
+): Database {
+  const make = (result: unknown[], setSpy?: (payload: unknown) => void) => {
     const q: Record<string, unknown> = {};
     for (const m of [
       'values',
@@ -20,7 +23,10 @@ function makeIngestDb(cfg: { blocked: boolean; eventInsertId: string | null }): 
       'onConflictDoUpdate',
       'returning',
     ]) {
-      q[m] = () => q;
+      q[m] = (arg: unknown) => {
+        if (m === 'set' && setSpy) setSpy(arg);
+        return q;
+      };
     }
     q.then = (res: (x: unknown[]) => unknown, rej: (e: unknown) => unknown) =>
       Promise.resolve(result).then(res, rej);
@@ -30,7 +36,7 @@ function makeIngestDb(cfg: { blocked: boolean; eventInsertId: string | null }): 
     insert: (table: unknown) =>
       make(table === events ? (cfg.eventInsertId ? [{ id: cfg.eventInsertId }] : []) : []),
     select: () => make([{ blocked: cfg.blocked }]),
-    update: () => make([]),
+    update: () => make([], onUpdateSet),
   } as unknown as Database;
 }
 
@@ -39,20 +45,23 @@ function makeDeps(cfg: { blocked: boolean; eventInsertId: string | null }): Inge
   startRun: ReturnType<typeof vi.fn>;
   completeRun: ReturnType<typeof vi.fn>;
   recordDrop: ReturnType<typeof vi.fn>;
+  contactUpdate: ReturnType<typeof vi.fn>;
 } {
   const enqueue = vi.fn(async () => undefined);
   const startRun = vi.fn(async () => 'run-1');
   const stage = vi.fn(async (_r: string, _n: string, fn: () => Promise<unknown>) => fn());
   const completeRun = vi.fn(async () => undefined);
   const recordDrop = vi.fn();
+  const contactUpdate = vi.fn();
   return {
-    db: makeIngestDb(cfg),
+    db: makeIngestDb(cfg, contactUpdate),
     enqueuer: { enqueue },
     pipeline: { startRun, stage, completeRun } as unknown as IngestDeps['pipeline'],
     recordDrop,
     enqueue,
     startRun,
     completeRun,
+    contactUpdate,
     now: () => new Date(0),
   };
 }
@@ -132,6 +141,29 @@ describe('IngestService.ingestPayload', () => {
     expect(result.persisted).toBe(1);
     expect(deps.enqueue).toHaveBeenCalledWith(QUEUES.media, 'media.fetch', expect.objectContaining({ eventId: 'e2', mediaId: 'MID-9' }));
     expect(deps.completeRun).not.toHaveBeenCalled();
+  });
+
+  it('persists the WhatsApp profile name when the payload carries a contact', async () => {
+    const deps = makeDeps({ blocked: false, eventInsertId: 'e1' });
+    const payload = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: 'PN1' },
+                contacts: [{ wa_id: '628a', profile: { name: 'Budi Santoso' } }],
+                messages: [{ id: 'wamid.n', from: '628a', type: 'text', timestamp: '1700000000', text: { body: 'hi' } }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const result = await new IngestService(deps).ingestPayload('t1', payload);
+    expect(result.persisted).toBe(1);
+    // touchContact took the senderName branch — the update includes profileName.
+    expect(deps.contactUpdate).toHaveBeenCalledWith(expect.objectContaining({ profileName: 'Budi Santoso' }));
   });
 
   it('counts a duplicate (idempotent) message without re-processing', async () => {

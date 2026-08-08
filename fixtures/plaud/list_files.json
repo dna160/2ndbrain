@@ -1,0 +1,21 @@
+{
+  "files": [
+    {
+      "id": "rec_2026072114_abc123",
+      "name": "Rapat supplier — pricing Q3",
+      "created_at": "2026-07-21T06:12:00.000Z",
+      "start_at": "2026-07-21T05:00:00.000Z",
+      "duration": 4230000,
+      "serial_number": "PLAUD-NOTE-PIN-0007"
+    },
+    {
+      "id": "rec_2026072109_def456",
+      "name": "1:1 with Sarah",
+      "created_at": "2026-07-21T02:40:00.000Z",
+      "start_at": "2026-07-21T02:00:00.000Z",
+      "duration": 1980000,
+      "serial_number": "PLAUD-NOTE-PIN-0007"
+    }
+  ],
+  "next_cursor": "eyJvZmZzZXQiOjJ9"
+}

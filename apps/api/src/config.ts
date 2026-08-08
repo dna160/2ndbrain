@@ -60,6 +60,20 @@ const ConfigSchema = z.object({
   /** Approved utility template name for out-of-window sends (docs/00 F5). */
   WA_UTILITY_TEMPLATE: z.string().default('daily_brief_ready'),
 
+  // ── Plaud meeting capture (docs/05) — all optional/dark until the sync loop turns on ─────
+  /** Master switch. The plaud-sync queue + workers only construct when true (Phase 3b). */
+  PLAUD_SYNC_ENABLED: z.coerce.boolean().default(false),
+  PLAUD_API_BASE: z.string().url().default('https://platform.plaud.ai/developer/api'),
+  PLAUD_REFRESH_URL: z.string().url().default('https://platform.plaud.ai/developer/api/auth/refresh'),
+  /** Optional in 3a–3d, promoted to required in 3e when Whisper is removed. */
+  PLAUD_CLIENT_ID: z.string().optional(),
+  PLAUD_CLIENT_SECRET: z.string().optional(),
+  PLAUD_REFRESH_TOKEN: z.string().optional(),
+  /** §12.2: mirror only transcript+notes to R2, not audio bytes. */
+  PLAUD_MIRROR_AUDIO: z.coerce.boolean().default(false),
+  /** §3.4: recordings with no transcript past this age emit a WhatsApp stall alert. */
+  PLAUD_STALL_ALERT_HOURS: z.coerce.number().int().positive().default(48),
+
   // ── Single-tenant bootstrap (idempotent, applied at api boot) ────────────
   // Both must be set for provisioning to run; neither has a fallback, because the seeded
   // 'Operator' contact is the nightly digest's recipient.
