@@ -12,6 +12,7 @@ import type { MetaSignatureGuard } from './middleware/metaSignature';
 import { registerCors } from './plugins/cors';
 import { registerMetaWebhookRoutes } from './routes/webhooks/meta';
 import { registerDlqRoutes } from './routes/internal/dlq';
+import { registerPlaudInternalRoutes } from './routes/internal/plaud';
 import { registerHealthRoutes } from './routes/internal/health';
 import { registerCalendarRoutes } from './routes/v1/calendar';
 import { registerConversationRoutes } from './routes/v1/conversations';
@@ -100,6 +101,7 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
       resolveTenantId: ing.resolveTenantId,
     });
     registerDlqRoutes(app, { db: deps.db, internalApiKey: ing.internalApiKey });
+    registerPlaudInternalRoutes(app, { enqueuer: ing.enqueuer, internalApiKey: ing.internalApiKey });
   }
 
   // Everything under /v1 requires a valid Clerk session and carries request.auth.tenantId.

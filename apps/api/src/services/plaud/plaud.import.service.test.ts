@@ -65,13 +65,15 @@ const READY = {
   duration: 4230000,
   serial_number: 'SN1',
   presigned_url: 'https://m/p1.mp3',
-  has_audio: true,
-  has_transcript: true,
-  has_summary: true,
-  source_list: [{ start: 0, end: 8200, speaker: 'Speaker 1', text: 'halo' }],
-  note_list: '## Notes\n- decided X',
+  source_list: [
+    {
+      data_type: 'transaction',
+      data_content: JSON.stringify([{ content: 'halo', start_time: 0, end_time: 8200, speaker: 'Speaker 1' }]),
+    },
+  ],
+  note_list: [{ data_type: 'auto_sum_note', data_content: '## Notes\n- decided X' }],
 };
-const NOT_READY = { ...READY, has_transcript: false, has_summary: false, source_list: [], note_list: '' };
+const NOT_READY = { ...READY, source_list: [], note_list: [] };
 
 function client(detail: unknown): PlaudClient {
   return {

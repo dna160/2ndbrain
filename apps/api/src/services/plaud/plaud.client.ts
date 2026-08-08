@@ -13,7 +13,7 @@ import {
   type PlaudFileSummary,
   plaudFileDetailSchema,
   plaudFileListSchema,
-  type PlaudSegment,
+  plaudTranscriptSegments,
 } from '@recall/shared';
 
 import type { TranscriptSegment } from '../../db/schema/meetings';
@@ -41,13 +41,14 @@ export interface PlaudClient {
   getFile(plaudId: string): Promise<PlaudFileDetail>;
 }
 
-/** Plaud speaker labels are opaque ("Speaker 1"); identity resolution is Phase 3c. */
-export function toTranscriptSegments(segments: PlaudSegment[]): TranscriptSegment[] {
-  return segments.map((s) => ({
-    startMs: Math.round(s.start),
-    endMs: Math.round(s.end),
+/** Extract the persisted transcript from a detail. Speaker labels are opaque ("Speaker 1");
+ *  identity resolution is Phase 3c. */
+export function toTranscriptSegments(detail: Pick<PlaudFileDetail, 'source_list'>): TranscriptSegment[] {
+  return plaudTranscriptSegments(detail).map((s) => ({
+    startMs: Math.round(s.start_time),
+    endMs: Math.round(s.end_time),
     speakerKey: s.speaker,
-    text: s.text.trim(),
+    text: s.content.trim(),
   }));
 }
 
@@ -66,7 +67,9 @@ export class HttpPlaudClient implements PlaudClient {
     if (!parsed.success) {
       throw new PlaudSchemaError('plaud list_files: unexpected shape', parsed.error.issues);
     }
-    return { files: parsed.data.files, nextCursor: parsed.data.next_cursor ?? null };
+    // Page-based API: a full page implies more may exist. The caller pages until short.
+    const full = parsed.data.data.length === pageSize;
+    return { files: parsed.data.data, nextCursor: full ? String(page + 1) : null };
   }
 
   async getFile(plaudId: string): Promise<PlaudFileDetail> {

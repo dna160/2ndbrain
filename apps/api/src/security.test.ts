@@ -111,6 +111,11 @@ describe('security authz matrix', () => {
     expect(res.statusCode).toBe(403);
   });
 
+  it('rejects POST /internal/plaud/sync without the internal API key (401)', async () => {
+    const res = await app.inject({ method: 'POST', url: '/internal/plaud/sync', payload: {} });
+    expect(res.statusCode).toBe(401);
+  });
+
   it('rejects /internal/dlq without the internal API key (401)', async () => {
     const res = await app.inject({ method: 'GET', url: '/internal/dlq' });
     expect(res.statusCode).toBe(401);

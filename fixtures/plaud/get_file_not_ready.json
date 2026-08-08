@@ -1,14 +1,11 @@
 {
-  "id": "rec_2026072109_def456",
-  "name": "1:1 with Sarah",
-  "created_at": "2026-07-21T02:40:00.000Z",
-  "start_at": "2026-07-21T02:00:00.000Z",
-  "duration": 1980000,
-  "serial_number": "PLAUD-NOTE-PIN-0007",
+  "id": "24647a317467f2cac813eddb9e1a81f0",
+  "name": "Konsultasi: Pengembangan Sistem",
+  "created_at": "2026-08-03T11:00:00",
+  "start_at": "2026-08-03T10:20:00",
+  "duration": 2368000,
+  "serial_number": "8811B30240369512",
   "presigned_url": null,
-  "has_audio": true,
-  "has_transcript": false,
-  "has_summary": false,
   "source_list": [],
-  "note_list": ""
+  "note_list": []
 }

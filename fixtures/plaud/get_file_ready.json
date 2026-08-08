@@ -1,20 +1,16 @@
 {
-  "id": "rec_2026072114_abc123",
-  "name": "Rapat supplier — pricing Q3",
-  "created_at": "2026-07-21T06:12:00.000Z",
-  "start_at": "2026-07-21T05:00:00.000Z",
-  "duration": 4230000,
-  "serial_number": "PLAUD-NOTE-PIN-0007",
-  "presigned_url": "https://media.plaud.ai/rec_2026072114_abc123.mp3?exp=1784700000&sig=deadbeef",
-  "has_audio": true,
-  "has_transcript": true,
-  "has_summary": true,
+  "id": "fe0aac1e4e636030d03b09d96656e910",
+  "name": "Rapat Mingguan: Strategi Penjualan",
+  "created_at": "2026-08-04T10:58:05",
+  "start_at": "2026-08-04T09:26:43",
+  "duration": 2367000,
+  "serial_number": "8811B30240369512",
+  "presigned_url": "https://media.plaud.ai/fe0aac1e.mp3?exp=1786288583&sig=deadbeef",
   "source_list": [
-    { "start": 0, "end": 8200, "speaker": "Speaker 1", "text": "Oke jadi kita mulai ya, soal pricing Q3." },
-    { "start": 8200, "end": 15400, "speaker": "Speaker 2", "text": "Yes — margin is tight, we need to renegotiate the courier rate." },
-    { "start": 15400, "end": 22100, "speaker": "Speaker 1", "text": "Setuju. Aku follow up ke RajaOngkir besok pagi." }
+    { "data_id": "source_transaction:775ea50e:fe0aac1e", "data_type": "transaction", "data_title": "", "data_content": "[{\"content\":\"Oke jadi kita mulai ya, soal pricing Q3.\",\"start_time\":3210,\"end_time\":8200,\"speaker\":\"Speaker 1\",\"original_speaker\":\"Speaker 1\"},{\"content\":\"Yes, margin is tight, we need to renegotiate the courier rate.\",\"start_time\":8200,\"end_time\":15400,\"speaker\":\"Speaker 2\",\"original_speaker\":\"Speaker 2\"}]", "data_link": "" },
+    { "data_id": "source_outline:775ea50e:fe0aac1e", "data_type": "outline", "data_title": "", "data_content": "- Q3 pricing\n- courier margin", "data_link": "" }
   ],
   "note_list": [
-    "## Topics\n- Q3 pricing and courier margin\n\n## Decisions\n- Renegotiate courier rate before Q3 close\n\n## Action items\n- [Speaker 1] Follow up with courier vendor tomorrow morning"
+    { "data_id": "auto_sum:775ea50e:fe0aac1e", "data_type": "auto_sum_note", "data_title": "Summary", "data_tab_name": "Summary", "data_content": "### Catatan Rapat\n- Renegotiate courier rate before Q3 close\n- [Speaker 1] Follow up with vendor tomorrow", "data_link": "", "data_error_code": 10 }
   ]
 }

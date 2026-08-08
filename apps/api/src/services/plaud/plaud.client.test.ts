@@ -18,19 +18,20 @@ function clientReturning(body: unknown, ok = true, status = 200) {
 }
 
 describe('HttpPlaudClient.listFiles', () => {
-  it('parses the recorded list_files page and exposes the cursor', async () => {
+  it('parses the recorded list_files page (data wrapper)', async () => {
     const { client, fetchMock } = clientReturning(fixture('list_files.json'));
     const { files, nextCursor } = await client.listFiles();
     expect(files).toHaveLength(2);
-    expect(files[0]?.id).toBe('rec_2026072114_abc123');
-    expect(files[0]?.duration).toBe(4230000);
-    expect(nextCursor).toBe('eyJvZmZzZXQiOjJ9');
+    expect(files[0]?.id).toBe('fe0aac1e4e636030d03b09d96656e910');
+    expect(files[0]?.duration).toBe(2367000);
+    // 2 items < default page size 50 → no next page.
+    expect(nextCursor).toBeNull();
     // Auth header carries the minted access token, never the refresh token.
     expect(fetchMock.mock.calls[0]![1].headers.authorization).toBe('Bearer access-tok');
   });
 
   it('hits the real page-based files endpoint', async () => {
-    const { client, fetchMock } = clientReturning({ files: [] });
+    const { client, fetchMock } = clientReturning({ data: [] });
     await client.listFiles({ page: 2, pageSize: 100 });
     const url = fetchMock.mock.calls[0]![0];
     expect(url).toContain('/open/third-party/files/?page=2&page_size=100');
@@ -48,20 +49,19 @@ describe('HttpPlaudClient.listFiles', () => {
 });
 
 describe('HttpPlaudClient.getFile', () => {
-  it('parses a ready file with transcript + notes', async () => {
+  it('parses a ready file with source + note blocks', async () => {
     const { client } = clientReturning(fixture('get_file_ready.json'));
-    const detail = await client.getFile('rec_2026072114_abc123');
-    expect(detail.has_transcript).toBe(true);
-    expect(detail.has_summary).toBe(true);
-    expect(detail.source_list).toHaveLength(3);
+    const detail = await client.getFile('fe0aac1e4e636030d03b09d96656e910');
+    expect(detail.source_list.map((b) => b.data_type)).toContain('transaction');
+    expect(detail.note_list[0]?.data_type).toBe('auto_sum_note');
     expect(detail.presigned_url).toContain('media.plaud.ai');
   });
 
-  it('parses a not-ready file: empty transcript, availability booleans false', async () => {
+  it('parses a not-ready file: empty source and note lists', async () => {
     const { client } = clientReturning(fixture('get_file_not_ready.json'));
-    const detail = await client.getFile('rec_2026072109_def456');
-    expect(detail.has_transcript).toBe(false);
+    const detail = await client.getFile('24647a317467f2cac813eddb9e1a81f0');
     expect(detail.source_list).toEqual([]);
+    expect(detail.note_list).toEqual([]);
     expect(detail.presigned_url).toBeNull();
   });
 
@@ -73,18 +73,21 @@ describe('HttpPlaudClient.getFile', () => {
 });
 
 describe('toTranscriptSegments', () => {
-  it('normalizes Plaud segments to the persisted TranscriptSegment shape', () => {
-    const detail = fixture('get_file_ready.json') as { source_list: never[] };
-    const segs = toTranscriptSegments(
-      (detail.source_list as unknown as { start: number; end: number; speaker: string; text: string }[]),
-    );
+  it('parses the transaction block JSON into persisted TranscriptSegments', () => {
+    const detail = fixture('get_file_ready.json') as Parameters<typeof toTranscriptSegments>[0];
+    const segs = toTranscriptSegments(detail);
     expect(segs[0]).toEqual({
-      startMs: 0,
+      startMs: 3210,
       endMs: 8200,
       speakerKey: 'Speaker 1',
       text: 'Oke jadi kita mulai ya, soal pricing Q3.',
     });
     // Speaker labels are preserved verbatim — identity resolution is Phase 3c.
     expect(segs[1]?.speakerKey).toBe('Speaker 2');
+  });
+
+  it('returns [] when there is no transaction block (not-ready file)', () => {
+    const detail = fixture('get_file_not_ready.json') as Parameters<typeof toTranscriptSegments>[0];
+    expect(toTranscriptSegments(detail)).toEqual([]);
   });
 });

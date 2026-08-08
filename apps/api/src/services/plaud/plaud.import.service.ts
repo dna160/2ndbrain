@@ -19,7 +19,7 @@ import { events, plaudRecordings, transcripts } from '../../db/schema';
 import type { PipelineService } from '../pipeline.service';
 import type { R2Client } from '../r2.service';
 import { type PlaudClient, PlaudSchemaError, toTranscriptSegments } from './plaud.client';
-import { plaudNotesMarkdown } from '@recall/shared';
+import { plaudIsReady, plaudNotesMarkdown } from '@recall/shared';
 
 export interface PlaudImportDeps {
   db: Database;
@@ -107,7 +107,8 @@ export class PlaudImportService {
       throw err;
     }
 
-    const ready = detail.has_transcript && detail.has_summary;
+    // No has_transcript/has_summary flags exist — readiness is derived from block content.
+    const ready = plaudIsReady(detail);
     if (!ready) {
       const [rec] = await this.deps.db
         .select({ firstSeenAt: plaudRecordings.firstSeenAt, alerted: plaudRecordings.stalledAlertSentAt })
@@ -126,7 +127,7 @@ export class PlaudImportService {
     }
 
     // Ready → import. contentHash guards against re-importing unchanged content (docs/05 §3.5).
-    const segments = toTranscriptSegments(detail.source_list);
+    const segments = toTranscriptSegments(detail);
     const notes = plaudNotesMarkdown(detail);
     const hash = createHash('sha256')
       .update(JSON.stringify(segments) + '\n' + notes)
