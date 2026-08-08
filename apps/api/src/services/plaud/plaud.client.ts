@@ -31,11 +31,9 @@ export class PlaudSchemaError extends Error {
 }
 
 export interface ListOptions {
-  /** Opaque forward cursor from a prior page. */
-  cursor?: string;
+  /** 1-based page (the Plaud API is page-based, not cursor-based — verified from the CLI). */
+  page?: number;
   pageSize?: number;
-  /** ISO lower bound; the sync loop applies a 6h overlap window on top (docs/05 §3.5). */
-  createdFrom?: string;
 }
 
 export interface PlaudClient {
@@ -60,12 +58,10 @@ export class HttpPlaudClient implements PlaudClient {
   ) {}
 
   async listFiles(opts: ListOptions = {}): Promise<{ files: PlaudFileSummary[]; nextCursor: string | null }> {
-    const params = new URLSearchParams();
-    if (opts.cursor) params.set('cursor', opts.cursor);
-    if (opts.pageSize) params.set('page_size', String(opts.pageSize));
-    if (opts.createdFrom) params.set('date_from', opts.createdFrom);
-    const query = params.toString();
-    const json = await this.get(`/files${query ? `?${query}` : ''}`);
+    const page = opts.page ?? 1;
+    const pageSize = opts.pageSize ?? 50;
+    // Real path verified from @plaud-ai/cli: GET /open/third-party/files/?page=&page_size=
+    const json = await this.get(`/open/third-party/files/?page=${page}&page_size=${pageSize}`);
     const parsed = plaudFileListSchema.safeParse(json);
     if (!parsed.success) {
       throw new PlaudSchemaError('plaud list_files: unexpected shape', parsed.error.issues);
@@ -74,7 +70,7 @@ export class HttpPlaudClient implements PlaudClient {
   }
 
   async getFile(plaudId: string): Promise<PlaudFileDetail> {
-    const json = await this.get(`/files/${encodeURIComponent(plaudId)}`);
+    const json = await this.get(`/open/third-party/files/${encodeURIComponent(plaudId)}`);
     const parsed = plaudFileDetailSchema.safeParse(json);
     if (!parsed.success) {
       throw new PlaudSchemaError(`plaud get_file ${plaudId}: unexpected shape`, parsed.error.issues);

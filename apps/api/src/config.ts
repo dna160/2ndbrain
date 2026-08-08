@@ -64,10 +64,16 @@ const ConfigSchema = z.object({
   /** Master switch. The plaud-sync queue + workers only construct when true (Phase 3b). */
   PLAUD_SYNC_ENABLED: z.coerce.boolean().default(false),
   PLAUD_API_BASE: z.string().url().default('https://platform.plaud.ai/developer/api'),
-  PLAUD_REFRESH_URL: z.string().url().default('https://platform.plaud.ai/developer/api/auth/refresh'),
-  /** Optional in 3a–3d, promoted to required in 3e when Whisper is removed. */
-  PLAUD_CLIENT_ID: z.string().optional(),
-  PLAUD_CLIENT_SECRET: z.string().optional(),
+  // Verified from @plaud-ai/cli — the real rotating-refresh endpoint.
+  PLAUD_REFRESH_URL: z
+    .string()
+    .url()
+    .default('https://platform.plaud.ai/developer/api/oauth/third-party/access-token/refresh'),
+  /**
+   * The ONLY Plaud credential the worker needs. Obtained once via `plaud login` on a machine with
+   * a browser; the refresh_token field of ~/.plaud/tokens.json. No client id/secret: Plaud's CLI
+   * is a public PKCE client and the refresh call sends only the refresh token.
+   */
   PLAUD_REFRESH_TOKEN: z.string().optional(),
   /** §12.2: mirror only transcript+notes to R2, not audio bytes. */
   PLAUD_MIRROR_AUDIO: z.coerce.boolean().default(false),

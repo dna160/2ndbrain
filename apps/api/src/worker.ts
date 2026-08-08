@@ -141,12 +141,20 @@ async function main(): Promise<void> {
 
   // ── Plaud meeting capture (docs/05) — constructed only when the flag is on ──────────────
   const plaudWorkers: Worker[] = [];
-  if (config.PLAUD_SYNC_ENABLED && config.PLAUD_REFRESH_TOKEN && config.PLAUD_CLIENT_ID && config.PLAUD_CLIENT_SECRET) {
+  if (config.PLAUD_SYNC_ENABLED && config.PLAUD_REFRESH_TOKEN) {
+    // Redis-backed store for the ROTATING refresh token: the env value is only a seed. On each
+    // refresh Plaud issues a new token; persisting it here is what keeps the worker alive past
+    // the first refresh and across restarts.
+    const refreshKey = 'plaud:refresh_token';
     const plaudToken = createPlaudTokenProvider({
       refreshUrl: config.PLAUD_REFRESH_URL,
-      clientId: config.PLAUD_CLIENT_ID,
-      clientSecret: config.PLAUD_CLIENT_SECRET,
-      refreshToken: config.PLAUD_REFRESH_TOKEN,
+      initialRefreshToken: config.PLAUD_REFRESH_TOKEN,
+      store: {
+        get: () => connection.get(refreshKey),
+        set: async (token) => {
+          await connection.set(refreshKey, token);
+        },
+      },
     });
     const plaudImports = new PlaudImportService({
       db,
@@ -158,7 +166,7 @@ async function main(): Promise<void> {
     plaudWorkers.push(createPlaudWorker({ connection, db, imports: plaudImports }));
     console.log('[worker] plaud sync ENABLED');
   } else if (config.PLAUD_SYNC_ENABLED) {
-    console.warn('[worker] PLAUD_SYNC_ENABLED but PLAUD_REFRESH_TOKEN/CLIENT_ID/CLIENT_SECRET missing — plaud sync OFF');
+    console.warn('[worker] PLAUD_SYNC_ENABLED but PLAUD_REFRESH_TOKEN missing — plaud sync OFF');
   }
 
   const workers: Worker[] = [

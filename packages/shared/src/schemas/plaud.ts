@@ -77,11 +77,15 @@ export const plaudFileDetailSchema = plaudFileSummarySchema.extend({
 });
 export type PlaudFileDetail = z.infer<typeof plaudFileDetailSchema>;
 
-/** OAuth token-refresh response. Shapes vary; we read the access token + its lifetime only. */
+/**
+ * OAuth token-refresh response (verified against @plaud-ai/cli). `refresh_token` ROTATES —
+ * the server issues a new one each refresh and it must be persisted (see plaud.auth.ts).
+ */
 export const plaudTokenResponseSchema = z.object({
   access_token: z.string().min(1),
   expires_in: z.number().int().positive(),
   token_type: z.string().optional(),
+  refresh_token: z.string().optional(),
 });
 export type PlaudTokenResponse = z.infer<typeof plaudTokenResponseSchema>;
 

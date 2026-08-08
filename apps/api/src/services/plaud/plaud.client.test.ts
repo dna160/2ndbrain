@@ -29,13 +29,11 @@ describe('HttpPlaudClient.listFiles', () => {
     expect(fetchMock.mock.calls[0]![1].headers.authorization).toBe('Bearer access-tok');
   });
 
-  it('forwards cursor / page_size / date_from as query params', async () => {
+  it('hits the real page-based files endpoint', async () => {
     const { client, fetchMock } = clientReturning({ files: [] });
-    await client.listFiles({ cursor: 'c1', pageSize: 100, createdFrom: '2026-07-20T00:00:00Z' });
+    await client.listFiles({ page: 2, pageSize: 100 });
     const url = fetchMock.mock.calls[0]![0];
-    expect(url).toContain('cursor=c1');
-    expect(url).toContain('page_size=100');
-    expect(url).toContain('date_from=2026-07-20');
+    expect(url).toContain('/open/third-party/files/?page=2&page_size=100');
   });
 
   it('throws PlaudSchemaError on a drifted response (undocumented-endpoint guard)', async () => {
@@ -70,7 +68,7 @@ describe('HttpPlaudClient.getFile', () => {
   it('url-encodes the file id in the path', async () => {
     const { client, fetchMock } = clientReturning(fixture('get_file_ready.json'));
     await client.getFile('rec/with space');
-    expect(fetchMock.mock.calls[0]![0]).toContain('/files/rec%2Fwith%20space');
+    expect(fetchMock.mock.calls[0]![0]).toContain('/open/third-party/files/rec%2Fwith%20space');
   });
 });
 
