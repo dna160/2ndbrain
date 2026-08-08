@@ -17,6 +17,7 @@ export const QUEUES = {
   digest: 'recall-digest',
   briefs: 'recall-briefs',
   calendarSync: 'recall-calendar-sync',
+  plaudSync: 'recall-plaud-sync',
 } as const;
 
 export const QUEUE_NAMES = Object.values(QUEUES);

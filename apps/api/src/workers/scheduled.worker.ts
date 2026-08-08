@@ -7,10 +7,12 @@
  */
 import { QUEUES } from '@recall/shared/constants';
 import { Queue, Worker } from 'bullmq';
+import { lte } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 
 import type { Database } from '../db/client';
-import { connectedAccounts, tenants } from '../db/schema';
+import { calendarEvents, connectedAccounts, tenants } from '../db/schema';
+import { plaudSyncJobsFor } from './plaud.schedule';
 import type { BriefsService } from '../services/briefs.service';
 import type { CalendarService } from '../services/calendar.service';
 import type { AlertsService } from '../services/alerts.service';
@@ -26,6 +28,9 @@ export interface ScheduledDeps {
   consolidation: ConsolidationService;
   digest: DigestService;
   alerts: AlertsService;
+  /** When true, register the Plaud base poll + adaptive-scheduling tick (docs/05 §12.3). */
+  plaudEnabled?: boolean;
+  now?: () => Date;
 }
 
 export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worker[]> {
@@ -39,6 +44,42 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   const digestQueue = new Queue(QUEUES.digest, { connection: deps.connection });
   // Nightly 21:00 WIB = 14:00 UTC (docs/00 F5).
   await digestQueue.add('nightly', {}, { repeat: { pattern: '0 14 * * *' }, jobId: 'digest-nightly', removeOnComplete: 30 });
+
+  // ── Plaud (docs/05 §12.3): 2h base poll + adaptive scheduling around calendar events ─────
+  const plaudQueue = new Queue(QUEUES.plaudSync, { connection: deps.connection });
+  const extraWorkers: Worker[] = [];
+  if (deps.plaudEnabled) {
+    const now = deps.now ?? (() => new Date());
+    await plaudQueue.add('sync', {}, { repeat: { every: 2 * 3600_000 }, jobId: 'plaud-sync-base', removeOnComplete: 50 });
+    // Re-plan adaptive syncs every 15 min. Deterministic jobIds mean re-ticks overwrite rather
+    // than pile up; delayed jobs are the pre-event guard + post-event bursts.
+    await plaudQueue.add('schedule', {}, { repeat: { every: 15 * 60_000 }, jobId: 'plaud-schedule', removeOnComplete: 20 });
+    const scheduler = new Worker(
+      QUEUES.plaudSync,
+      async (job) => {
+        if (job.name !== 'schedule') return; // 'sync' jobs are handled by the plaud consumer worker
+        const horizon = new Date(now().getTime() + 24 * 3600_000);
+        const rows = await deps.db
+          .select({ gcalId: calendarEvents.gcalId, startAt: calendarEvents.startAt, endAt: calendarEvents.endAt, tenantId: calendarEvents.tenantId })
+          .from(calendarEvents)
+          .where(lte(calendarEvents.startAt, horizon));
+        const byTenant = new Map<string, { gcalId: string; startAt: Date; endAt: Date }[]>();
+        for (const r of rows) {
+          const list = byTenant.get(r.tenantId) ?? [];
+          list.push({ gcalId: r.gcalId, startAt: r.startAt, endAt: r.endAt });
+          byTenant.set(r.tenantId, list);
+        }
+        for (const [tenantId, evs] of byTenant) {
+          for (const j of plaudSyncJobsFor(evs, now())) {
+            await plaudQueue.add('sync', { tenantId }, { delay: j.delayMs, jobId: j.jobId, removeOnComplete: 20 });
+          }
+        }
+      },
+      { connection: deps.connection },
+    );
+    scheduler.on('failed', onFailedToDlq(deps.db, QUEUES.plaudSync));
+    extraWorkers.push(scheduler);
+  }
 
   const calWorker = new Worker(
     QUEUES.calendarSync,
@@ -92,5 +133,5 @@ export async function createScheduledWorkers(deps: ScheduledDeps): Promise<Worke
   );
   digestWorker.on('failed', onFailedToDlq(deps.db, QUEUES.digest));
 
-  return [calWorker, briefWorker, consolidationWorker, digestWorker];
+  return [calWorker, briefWorker, consolidationWorker, digestWorker, ...extraWorkers];
 }

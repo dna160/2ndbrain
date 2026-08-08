@@ -31,6 +31,10 @@ import { GroqWhisperProvider } from './services/stt/groqWhisper';
 import { TranscriptionService } from './services/transcription.service';
 import { WaSendService } from './services/waSend.service';
 import { createMediaWorker } from './workers/media.worker';
+import { createPlaudWorker } from './workers/plaud.worker';
+import { HttpPlaudClient } from './services/plaud/plaud.client';
+import { createPlaudTokenProvider } from './services/plaud/plaud.auth';
+import { PlaudImportService } from './services/plaud/plaud.import.service';
 import { createScheduledWorkers } from './workers/scheduled.worker';
 import { createStructuringWorker } from './workers/structuring.worker';
 import { createTranscriptionWorker } from './workers/transcription.worker';
@@ -135,11 +139,43 @@ async function main(): Promise<void> {
     operatorWaId: operator?.waId ?? '',
   });
 
+  // ── Plaud meeting capture (docs/05) — constructed only when the flag is on ──────────────
+  const plaudWorkers: Worker[] = [];
+  if (config.PLAUD_SYNC_ENABLED && config.PLAUD_REFRESH_TOKEN && config.PLAUD_CLIENT_ID && config.PLAUD_CLIENT_SECRET) {
+    const plaudToken = createPlaudTokenProvider({
+      refreshUrl: config.PLAUD_REFRESH_URL,
+      clientId: config.PLAUD_CLIENT_ID,
+      clientSecret: config.PLAUD_CLIENT_SECRET,
+      refreshToken: config.PLAUD_REFRESH_TOKEN,
+    });
+    const plaudImports = new PlaudImportService({
+      db,
+      plaud: new HttpPlaudClient(config.PLAUD_API_BASE, plaudToken),
+      r2,
+      pipeline,
+      stallHours: config.PLAUD_STALL_ALERT_HOURS,
+    });
+    plaudWorkers.push(createPlaudWorker({ connection, db, imports: plaudImports }));
+    console.log('[worker] plaud sync ENABLED');
+  } else if (config.PLAUD_SYNC_ENABLED) {
+    console.warn('[worker] PLAUD_SYNC_ENABLED but PLAUD_REFRESH_TOKEN/CLIENT_ID/CLIENT_SECRET missing — plaud sync OFF');
+  }
+
   const workers: Worker[] = [
     createMediaWorker({ connection, db, media }),
     createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
     createStructuringWorker({ connection, db, structuring, pipeline }),
-    ...(await createScheduledWorkers({ connection, db, calendar, briefs, consolidation, digest, alerts })),
+    ...plaudWorkers,
+    ...(await createScheduledWorkers({
+      connection,
+      db,
+      calendar,
+      briefs,
+      consolidation,
+      digest,
+      alerts,
+      plaudEnabled: plaudWorkers.length > 0,
+    })),
   ];
   console.log('[worker] booted — media, transcription, structuring, calendar-sync, briefs.');
 

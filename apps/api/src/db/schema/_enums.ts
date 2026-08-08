@@ -10,7 +10,9 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 export const userRoleEnum = pgEnum('user_role', ['owner', 'member']);
 
 // ── events ──────────────────────────────────────────────────────────────────
-export const eventSourceEnum = pgEnum('event_source', ['wa', 'gcal', 'upload', 'system']);
+// 'plaud' added in the Plaud migration (docs/05). A meeting recording pulled from Plaud is a
+// distinct provenance source from a WA voice note ('wa') or a manual upload ('upload').
+export const eventSourceEnum = pgEnum('event_source', ['wa', 'gcal', 'upload', 'system', 'plaud']);
 export const eventTypeEnum = pgEnum('event_type', [
   'message',
   'audio',
@@ -28,7 +30,18 @@ export const transcriptStatusEnum = pgEnum('transcript_status', [
   'done',
   'failed',
 ]);
-export const diarizationModeEnum = pgEnum('diarization_mode', ['none', 'llm', 'pyannote']);
+// 'plaud' added in the Plaud migration: Plaud diarizes upstream and returns speaker labels.
+export const diarizationModeEnum = pgEnum('diarization_mode', ['none', 'llm', 'pyannote', 'plaud']);
+
+// ── Plaud meeting capture (docs/05 §3.4) — mirrors plaudReadinessStates in @recall/shared ────
+export const plaudReadinessEnum = pgEnum('plaud_readiness', [
+  'discovered',
+  'awaiting_transcript',
+  'ready',
+  'ingested',
+  'stalled',
+  'superseded',
+]);
 export const taskStatusEnum = pgEnum('task_status', ['open', 'done', 'dropped']);
 
 // ── memory ────────────────────────────────────────────────────────────────────
