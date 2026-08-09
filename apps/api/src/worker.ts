@@ -35,6 +35,7 @@ import { createPlaudWorker } from './workers/plaud.worker';
 import { HttpPlaudClient } from './services/plaud/plaud.client';
 import { createPlaudTokenProvider } from './services/plaud/plaud.auth';
 import { PlaudImportService } from './services/plaud/plaud.import.service';
+import { SpeakerResolver } from './services/plaud/speaker.resolver';
 import { createScheduledWorkers } from './workers/scheduled.worker';
 import { createStructuringWorker } from './workers/structuring.worker';
 import { createTranscriptionWorker } from './workers/transcription.worker';
@@ -161,7 +162,11 @@ async function main(): Promise<void> {
       plaud: new HttpPlaudClient(config.PLAUD_API_BASE, plaudToken),
       r2,
       pipeline,
+      speakers: new SpeakerResolver(db),
       stallHours: config.PLAUD_STALL_ALERT_HOURS,
+      onStalled: (_tenantId, rec) => {
+        void alerts.plaudStalled(rec.name);
+      },
     });
     plaudWorkers.push(createPlaudWorker({ connection, db, imports: plaudImports }));
     console.log('[worker] plaud sync ENABLED');

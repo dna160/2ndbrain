@@ -42,6 +42,29 @@ export const plaudRecordings = pgTable(
   ],
 );
 
+/**
+ * Confirmed speaker-label → contact mappings (docs/05 §3.6). Keyed by device + label so a
+ * recurring participant (same Plaud device, "Speaker 1") stops needing confirmation after the
+ * operator confirms them once. Written by SpeakerService.confirm; read at import time.
+ */
+export const speakerAliases = pgTable(
+  'speaker_aliases',
+  {
+    id: idColumn(),
+    tenantId: tenantIdColumn(),
+    /** entities.id of the resolved person. */
+    contactId: uuid('contact_id').notNull(),
+    /** Plaud device serial_number — scopes labels to a physical recorder. */
+    deviceSerial: text('device_serial').notNull(),
+    /** The opaque Plaud label, e.g. "Speaker 1". */
+    speakerLabel: text('speaker_label').notNull(),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }).notNull().defaultNow(),
+    confirmedVia: text('confirmed_via').notNull().default('dashboard'),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('speaker_aliases_key_uq').on(t.tenantId, t.deviceSerial, t.speakerLabel)],
+);
+
 export const plaudSyncState = pgTable(
   'plaud_sync_state',
   {

@@ -35,4 +35,12 @@ export class AlertsService {
     }
     return { count: n, alerted: false };
   }
+
+  /** A Plaud recording has had no transcript past the stall threshold (docs/05 §3.4). */
+  async plaudStalled(name: string): Promise<void> {
+    await this.deps.waSend.send(
+      this.deps.operatorWaId,
+      `Recall alert: the Plaud recording "${name}" still has no transcript. AutoFlow may be off.`,
+    );
+  }
 }

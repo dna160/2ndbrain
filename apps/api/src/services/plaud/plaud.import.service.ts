@@ -15,10 +15,11 @@ import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db/client';
-import { events, plaudRecordings, transcripts } from '../../db/schema';
+import { events, meetings, plaudRecordings, transcripts } from '../../db/schema';
 import type { PipelineService } from '../pipeline.service';
 import type { R2Client } from '../r2.service';
 import { type PlaudClient, PlaudSchemaError, toTranscriptSegments } from './plaud.client';
+import { distinctSpeakers, type SpeakerResolver } from './speaker.resolver';
 import { plaudIsReady, plaudNotesMarkdown } from '@recall/shared';
 
 export interface PlaudImportDeps {
@@ -26,6 +27,7 @@ export interface PlaudImportDeps {
   plaud: PlaudClient;
   r2: Pick<R2Client, 'put'>;
   pipeline: Pick<PipelineService, 'startRun' | 'stage' | 'completeRun'>;
+  speakers: SpeakerResolver;
   stallHours: number;
   now?: () => Date;
   /** Emitted once when a recording crosses the stall threshold (wired to WA alerts in 3c). */
@@ -198,6 +200,31 @@ export class PlaudImportService {
       return { eventId: evId, transcriptId: trRows[0]?.id ?? null };
     });
 
+    // Meeting row: the operator-facing object, with speakers resolved (docs/05 §3.6). Known
+    // recurring speakers auto-confirm via alias; the rest await confirmation via the existing
+    // POST /v1/meetings/:id/participants/:speakerKey/confirm route.
+    const meetingId = await this.deps.pipeline.stage(runId, 'structured', async () => {
+      const labels = distinctSpeakers(segments);
+      const [participants, calendarEventId] = await Promise.all([
+        this.deps.speakers.resolveParticipants(tenantId, detail.serial_number ?? null, labels),
+        this.deps.speakers.matchCalendarEvent(tenantId, this.parseDate(detail.start_at)),
+      ]);
+      if (!transcriptId) return null;
+      const mRows = await this.deps.db
+        .insert(meetings)
+        .values({
+          tenantId,
+          transcriptId,
+          calendarEventId,
+          title: detail.name,
+          occurredAt: this.parseDate(detail.start_at) ?? this.now(),
+          participants,
+          summary: notes,
+        })
+        .returning({ id: meetings.id });
+      return mRows[0]?.id ?? null;
+    });
+
     await this.setState(tenantId, plaudId, {
       readiness: 'ingested',
       contentHash: hash,
@@ -205,6 +232,7 @@ export class PlaudImportService {
       notesR2Key,
       eventId,
       transcriptId,
+      meetingId,
       ingestedAt: this.now(),
       error: null,
     });

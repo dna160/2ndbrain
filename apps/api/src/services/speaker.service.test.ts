@@ -20,8 +20,10 @@ function makeDb(cfg: {
     const q: Record<string, unknown> = {};
     q.from = () => q;
     q.where = () => q;
+    q.limit = () => q;
     q.returning = () => q;
     q.values = () => q;
+    q.onConflictDoUpdate = () => q;
     q.set = (v: Record<string, unknown>) => {
       onSet?.(v);
       return q;

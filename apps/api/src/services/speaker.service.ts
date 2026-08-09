@@ -9,7 +9,7 @@
 import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../db/client';
-import { entities, meetings, type MeetingParticipant } from '../db/schema';
+import { entities, meetings, type MeetingParticipant, plaudRecordings, speakerAliases } from '../db/schema';
 
 export interface ConfirmInput {
   entityId?: string;
@@ -58,6 +58,23 @@ export class SpeakerService {
       .update(meetings)
       .set({ participants, updatedAt: this.now() })
       .where(and(eq(meetings.tenantId, tenantId), eq(meetings.id, meetingId)));
+
+    // Persist the mapping so this speaker auto-resolves on future imports from the same Plaud
+    // device (docs/05 §3.6). Only applies to Plaud meetings — matched via the recording's serial.
+    const [rec] = await this.deps.db
+      .select({ serial: plaudRecordings.serialNumber })
+      .from(plaudRecordings)
+      .where(and(eq(plaudRecordings.tenantId, tenantId), eq(plaudRecordings.meetingId, meetingId)))
+      .limit(1);
+    if (rec?.serial) {
+      await this.deps.db
+        .insert(speakerAliases)
+        .values({ tenantId, contactId: entityId, deviceSerial: rec.serial, speakerLabel: speakerKey, confirmedVia: 'dashboard' })
+        .onConflictDoUpdate({
+          target: [speakerAliases.tenantId, speakerAliases.deviceSerial, speakerAliases.speakerLabel],
+          set: { contactId: entityId, confirmedAt: this.now(), updatedAt: this.now() },
+        });
+    }
 
     return { entityId };
   }

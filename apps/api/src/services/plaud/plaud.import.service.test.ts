@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { events, plaudRecordings, transcripts } from '../../db/schema';
+import { events, meetings, plaudRecordings, transcripts } from '../../db/schema';
 import type { Database } from '../../db/client';
 import { PlaudImportService } from './plaud.import.service';
 import type { PlaudClient } from './plaud.client';
 import type { PipelineService } from '../pipeline.service';
+import type { SpeakerResolver } from './speaker.resolver';
 
 /**
  * FIFO-per-table fake drizzle handle. `select`/`insert` shift the next queued result for the
@@ -87,6 +88,14 @@ function client(detail: unknown): PlaudClient {
 
 const r2 = () => ({ put: vi.fn(async () => undefined) });
 
+// Stub resolver: no known aliases, no calendar match — participants stay unconfirmed.
+const speakers = () =>
+  ({
+    resolveParticipants: async (_t: string, _s: string | null, labels: string[]) =>
+      labels.map((speakerKey) => ({ speakerKey, confirmed: false, confidence: 0 })),
+    matchCalendarEvent: async () => null,
+  }) as unknown as SpeakerResolver;
+
 describe('PlaudImportService state machine', () => {
   it('imports a ready recording: event + transcript + 2 R2 mirrors + ingested', async () => {
     const updates: Record<string, unknown>[] = [];
@@ -99,12 +108,13 @@ describe('PlaudImportService state machine', () => {
         { table: plaudRecordings, rows: [{ id: 'rec1' }] }, // discover insert (new)
         { table: events, rows: [{ id: 'ev1' }] },
         { table: transcripts, rows: [{ id: 'tr1' }] },
+        { table: meetings, rows: [{ id: 'mt1' }] },
       ],
       onUpdate: (p) => updates.push(p),
     });
     const p = pipeline();
     const r = r2();
-    const svc = new PlaudImportService({ db, plaud: client(READY), r2: r, pipeline: p, stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
+    const svc = new PlaudImportService({ db, plaud: client(READY), r2: r, pipeline: p, speakers: speakers(), stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
 
     const result = await svc.sync('t1');
     expect(result.imported).toBe(1);
@@ -131,7 +141,7 @@ describe('PlaudImportService state machine', () => {
     });
     const p = pipeline();
     const r = r2();
-    const svc = new PlaudImportService({ db, plaud: client(NOT_READY), r2: r, pipeline: p, stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
+    const svc = new PlaudImportService({ db, plaud: client(NOT_READY), r2: r, pipeline: p, speakers: speakers(), stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
 
     const result = await svc.sync('t1');
     expect(result.advanced).toBe(1);
@@ -157,6 +167,7 @@ describe('PlaudImportService state machine', () => {
       plaud: client(NOT_READY),
       r2: r2(),
       pipeline: pipeline(),
+      speakers: speakers(),
       stallHours: 48,
       now: () => new Date('2026-08-08T10:00:00Z'),
       onStalled,
@@ -182,7 +193,7 @@ describe('PlaudImportService state machine', () => {
       onUpdate: (p) => updates.push(p),
     });
     const p = pipeline();
-    const svc = new PlaudImportService({ db, plaud: client(READY), r2: r2(), pipeline: p, stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
+    const svc = new PlaudImportService({ db, plaud: client(READY), r2: r2(), pipeline: p, speakers: speakers(), stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
     const result = await svc.sync('t1');
     expect(result.imported).toBe(0);
     expect(p.startRun).not.toHaveBeenCalled(); // no re-import, no cost run
