@@ -15,7 +15,8 @@ import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db/client';
-import { events, meetings, plaudRecordings, transcripts } from '../../db/schema';
+import { events, meetings, plaudRecordings, transcripts, type TranscriptSegment } from '../../db/schema';
+import type { PlaudFileDetail } from '@recall/shared';
 import type { PipelineService } from '../pipeline.service';
 import type { R2Client } from '../r2.service';
 import { type PlaudClient, PlaudSchemaError, toTranscriptSegments } from './plaud.client';
@@ -63,7 +64,10 @@ export class PlaudImportService {
       .where(and(eq(plaudRecordings.tenantId, tenantId)));
 
     for (const rec of pending) {
-      if (rec.readiness === 'ingested' || rec.readiness === 'superseded') continue;
+      if (rec.readiness === 'superseded') continue;
+      // Fully done = ingested AND has a meeting. An ingested row without a meeting is re-checked
+      // so advance() can backfill the missing meeting (pre-3c imports).
+      if (rec.readiness === 'ingested' && rec.meetingId) continue;
       const outcome = await this.advance(tenantId, rec.plaudId);
       if (outcome === 'imported') result.imported++;
       else if (outcome === 'stalled') result.stalled++;
@@ -136,10 +140,27 @@ export class PlaudImportService {
       .digest('hex');
 
     const [existing] = await this.deps.db
-      .select({ readiness: plaudRecordings.readiness, contentHash: plaudRecordings.contentHash })
+      .select({
+        readiness: plaudRecordings.readiness,
+        contentHash: plaudRecordings.contentHash,
+        meetingId: plaudRecordings.meetingId,
+        transcriptId: plaudRecordings.transcriptId,
+      })
       .from(plaudRecordings)
       .where(and(eq(plaudRecordings.tenantId, tenantId), eq(plaudRecordings.plaudId, plaudId)));
-    if (existing?.readiness === 'ingested' && existing.contentHash === hash) return 'noop';
+
+    if (existing?.readiness === 'ingested' && existing.contentHash === hash) {
+      if (existing.meetingId) return 'noop';
+      // Backfill: event + transcript already exist (imported before meeting-creation existed),
+      // just the meeting row is missing. Create it from the existing transcript — no re-import,
+      // so no duplicate event/transcript. Self-heals the pre-3c imports.
+      if (existing.transcriptId) {
+        const meetingId = await this.createMeeting(tenantId, detail, existing.transcriptId, segments, notes);
+        await this.setState(tenantId, plaudId, { meetingId });
+        return 'imported';
+      }
+      return 'noop';
+    }
 
     const runId = await this.deps.pipeline.startRun({
       tenantId,
@@ -203,27 +224,11 @@ export class PlaudImportService {
     // Meeting row: the operator-facing object, with speakers resolved (docs/05 §3.6). Known
     // recurring speakers auto-confirm via alias; the rest await confirmation via the existing
     // POST /v1/meetings/:id/participants/:speakerKey/confirm route.
-    const meetingId = await this.deps.pipeline.stage(runId, 'structured', async () => {
-      const labels = distinctSpeakers(segments);
-      const [participants, calendarEventId] = await Promise.all([
-        this.deps.speakers.resolveParticipants(tenantId, detail.serial_number ?? null, labels),
-        this.deps.speakers.matchCalendarEvent(tenantId, this.parseDate(detail.start_at)),
-      ]);
-      if (!transcriptId) return null;
-      const mRows = await this.deps.db
-        .insert(meetings)
-        .values({
-          tenantId,
-          transcriptId,
-          calendarEventId,
-          title: detail.name,
-          occurredAt: this.parseDate(detail.start_at) ?? this.now(),
-          participants,
-          summary: notes,
-        })
-        .returning({ id: meetings.id });
-      return mRows[0]?.id ?? null;
-    });
+    const meetingId = transcriptId
+      ? await this.deps.pipeline.stage(runId, 'structured', () =>
+          this.createMeeting(tenantId, detail, transcriptId, segments, notes),
+        )
+      : null;
 
     await this.setState(tenantId, plaudId, {
       readiness: 'ingested',
@@ -238,6 +243,34 @@ export class PlaudImportService {
     });
     await this.deps.pipeline.completeRun(runId);
     return 'imported';
+  }
+
+  /** Create the operator-facing meeting row with resolved speakers + calendar link. */
+  private async createMeeting(
+    tenantId: string,
+    detail: PlaudFileDetail,
+    transcriptId: string,
+    segments: TranscriptSegment[],
+    notes: string,
+  ): Promise<string | null> {
+    const labels = distinctSpeakers(segments);
+    const [participants, calendarEventId] = await Promise.all([
+      this.deps.speakers.resolveParticipants(tenantId, detail.serial_number ?? null, labels),
+      this.deps.speakers.matchCalendarEvent(tenantId, this.parseDate(detail.start_at)),
+    ]);
+    const mRows = await this.deps.db
+      .insert(meetings)
+      .values({
+        tenantId,
+        transcriptId,
+        calendarEventId,
+        title: detail.name,
+        occurredAt: this.parseDate(detail.start_at) ?? this.now(),
+        participants,
+        summary: notes,
+      })
+      .returning({ id: meetings.id });
+    return mRows[0]?.id ?? null;
   }
 
   private async setState(

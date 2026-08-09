@@ -178,17 +178,39 @@ describe('PlaudImportService state machine', () => {
     expect(updates.at(-1)?.readiness).toBe('stalled');
   });
 
-  it('is idempotent: an already-ingested recording with an unchanged hash is a no-op', async () => {
-    // Pre-compute the hash the service will derive for READY so the "existing" row matches.
+  it('backfills a missing meeting for an ingested recording without re-importing', async () => {
     const { createHash } = await import('node:crypto');
     const segments = [{ startMs: 0, endMs: 8200, speakerKey: 'Speaker 1', text: 'halo' }];
     const hash = createHash('sha256').update(JSON.stringify(segments) + '\n' + '## Notes\n- decided X').digest('hex');
     const updates: Record<string, unknown>[] = [];
     const db = fakeDb({
       selects: [
-        { table: plaudRecordings, rows: [{ plaudId: 'p1', readiness: 'ingested' }] },
-        { table: plaudRecordings, rows: [{ readiness: 'ingested', contentHash: hash }] },
+        // pending list: ingested but meetingId null → NOT skipped, gets re-checked for backfill.
+        { table: plaudRecordings, rows: [{ plaudId: 'p1', readiness: 'ingested', meetingId: null }] },
+        // existing check: ingested, same hash, no meeting, transcript present → backfill.
+        { table: plaudRecordings, rows: [{ readiness: 'ingested', contentHash: hash, meetingId: null, transcriptId: 'tr-old' }] },
       ],
+      inserts: [
+        { table: plaudRecordings, rows: [] }, // discover: already exists
+        { table: meetings, rows: [{ id: 'mt-backfilled' }] },
+      ],
+      onUpdate: (p) => updates.push(p),
+    });
+    const p = pipeline();
+    const r = r2();
+    const svc = new PlaudImportService({ db, plaud: client(READY), r2: r, pipeline: p, speakers: speakers(), stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
+    const result = await svc.sync('t1');
+    expect(result.imported).toBe(1);
+    expect(r.put).not.toHaveBeenCalled(); // no re-mirror
+    expect(p.startRun).not.toHaveBeenCalled(); // no re-import run
+    expect(updates.at(-1)?.meetingId).toBe('mt-backfilled'); // meeting linked
+  });
+
+  it('is idempotent: an already-ingested recording with an unchanged hash is a no-op', async () => {
+    const updates: Record<string, unknown>[] = [];
+    // Fully done: ingested WITH a meeting → skipped in the sync loop, advance() never called.
+    const db = fakeDb({
+      selects: [{ table: plaudRecordings, rows: [{ plaudId: 'p1', readiness: 'ingested', meetingId: 'mt1' }] }],
       inserts: [{ table: plaudRecordings, rows: [] }],
       onUpdate: (p) => updates.push(p),
     });
