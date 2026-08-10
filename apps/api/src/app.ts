@@ -128,13 +128,11 @@ export function buildApp(deps: BuildAppDeps): FastifyInstance {
         registerUploadRoutes(scoped, {
           db: deps.db,
           r2: deps.ingestion.r2,
-          enqueuer: deps.ingestion.enqueuer,
           pipeline: deps.ingestion.pipeline,
         });
         registerPipelineRoutes(scoped, {
           db: deps.db,
           queueStats: deps.ingestion.queueStats,
-          enqueuer: deps.ingestion.enqueuer,
         });
       }
     },

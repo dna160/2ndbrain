@@ -14,7 +14,6 @@ const validEnv = {
   R2_BUCKET: 'recall-media',
   META_APP_SECRET: 'da5cbd8dce8821884b190b2a344387ad',
   META_ACCESS_TOKEN: 'meta-token',
-  GROQ_API_KEY: 'groq-key',
   DEEPSEEK_API_KEY: 'deepseek-key',
   META_WEBHOOK_VERIFY_TOKEN: 'verify-token',
   META_PHONE_NUMBER_ID: 'pn-1',

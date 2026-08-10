@@ -9,12 +9,10 @@
  */
 import { createHash } from 'node:crypto';
 
-import { QUEUES } from '@recall/shared/constants';
 import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../db/client';
 import { events, mediaAssets } from '../db/schema';
-import type { Enqueuer } from '../queues';
 import type { MetaMediaClient } from './meta/media.client';
 import type { PipelineService } from './pipeline.service';
 import type { R2Client } from './r2.service';
@@ -31,8 +29,7 @@ export interface MediaDeps {
   db: Database;
   r2: Pick<R2Client, 'put'>;
   meta: MetaMediaClient;
-  enqueuer: Pick<Enqueuer, 'enqueue'>;
-  pipeline: Pick<PipelineService, 'stage'>;
+  pipeline: Pick<PipelineService, 'stage' | 'completeRun'>;
   now?: () => Date;
 }
 
@@ -44,7 +41,7 @@ export class MediaService {
   }
 
   async fetchAndStore(job: MediaJobData): Promise<{ mediaAssetId: string }> {
-    return this.deps.pipeline.stage(job.runId, 'media_stored', async () => {
+    const result = await this.deps.pipeline.stage(job.runId, 'media_stored', async () => {
       const meta = await this.deps.meta.getMediaMeta(job.mediaId);
       const bytes = await this.deps.meta.download(meta.url);
 
@@ -88,17 +85,12 @@ export class MediaService {
         .set({ mediaAssetId, updatedAt: this.now() })
         .where(eq(events.id, job.eventId));
 
-      const mime = job.mime ?? meta.mimeType;
-      if (mime.startsWith('audio')) {
-        await this.deps.enqueuer.enqueue(QUEUES.transcription, 'transcription.run', {
-          tenantId: job.tenantId,
-          eventId: job.eventId,
-          mediaAssetId,
-          runId: job.runId,
-        });
-      }
-
       return { mediaAssetId };
     });
+
+    // Meeting capture is Plaud's job now; WhatsApp media (incl. voice notes) is stored, not
+    // transcribed (docs/05 §12.1 Option C). Nothing downstream, so close the run here.
+    await this.deps.pipeline.completeRun(job.runId);
+    return result;
   }
 }

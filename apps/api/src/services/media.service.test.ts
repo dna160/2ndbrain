@@ -22,9 +22,9 @@ function makeDeps(cfg: {
   dedupeHit: string | null;
   insertId: string | null;
   mimeType: string;
-}): MediaDeps & { put: ReturnType<typeof vi.fn>; enqueue: ReturnType<typeof vi.fn> } {
+}): MediaDeps & { put: ReturnType<typeof vi.fn>; completeRun: ReturnType<typeof vi.fn> } {
   const put = vi.fn(async () => undefined);
-  const enqueue = vi.fn(async () => undefined);
+  const completeRun = vi.fn(async () => undefined);
   return {
     db: makeDb(cfg),
     r2: { put },
@@ -32,12 +32,12 @@ function makeDeps(cfg: {
       getMediaMeta: vi.fn(async () => ({ url: 'https://m/x', mimeType: cfg.mimeType, fileSize: 3 })),
       download: vi.fn(async () => new Uint8Array([1, 2, 3])),
     },
-    enqueuer: { enqueue },
     pipeline: {
       stage: vi.fn(async (_r: string, _n: string, fn: () => Promise<unknown>) => fn()),
+      completeRun,
     } as unknown as MediaDeps['pipeline'],
     put,
-    enqueue,
+    completeRun,
     now: () => new Date(0),
   };
 }
@@ -45,16 +45,13 @@ function makeDeps(cfg: {
 const job = { tenantId: 't1', eventId: 'e1', mediaId: 'MID', mime: null, runId: 'run-1' };
 
 describe('MediaService.fetchAndStore', () => {
-  it('stores a new asset in R2 and enqueues transcription for audio', async () => {
+  it('stores a new asset in R2 and completes the run — audio is stored, not transcribed', async () => {
     const deps = makeDeps({ dedupeHit: null, insertId: 'ma1', mimeType: 'audio/ogg' });
     const result = await new MediaService(deps).fetchAndStore(job);
     expect(result).toEqual({ mediaAssetId: 'ma1' });
     expect(deps.put).toHaveBeenCalledOnce();
-    expect(deps.enqueue).toHaveBeenCalledWith(
-      'recall-transcription',
-      'transcription.run',
-      expect.objectContaining({ mediaAssetId: 'ma1' }),
-    );
+    // Option C: WA media (incl. voice notes) is stored, then the run is closed — no transcription.
+    expect(deps.completeRun).toHaveBeenCalledWith('run-1');
   });
 
   it('reuses an existing asset on sha256 dedupe (no R2 put)', async () => {
@@ -62,13 +59,13 @@ describe('MediaService.fetchAndStore', () => {
     const result = await new MediaService(deps).fetchAndStore(job);
     expect(result).toEqual({ mediaAssetId: 'ma-existing' });
     expect(deps.put).not.toHaveBeenCalled();
-    expect(deps.enqueue).toHaveBeenCalledOnce();
+    expect(deps.completeRun).toHaveBeenCalledOnce();
   });
 
-  it('does not enqueue transcription for non-audio media', async () => {
+  it('completes the run for non-audio media too (image stored)', async () => {
     const deps = makeDeps({ dedupeHit: null, insertId: 'ma2', mimeType: 'image/jpeg' });
     await new MediaService(deps).fetchAndStore(job);
-    expect(deps.enqueue).not.toHaveBeenCalled();
+    expect(deps.completeRun).toHaveBeenCalledWith('run-1');
   });
 
   it('throws when the media insert returns no id', async () => {

@@ -1,6 +1,6 @@
 /**
  * Worker bootstrap (MODE=worker) — same image as the api (docs/01 §1). BullMQ consumers:
- * media (P2), transcription + structuring (P3), calendar sync + briefs (P5, repeatable).
+ * media (P2), plaud-sync (docs/05), calendar sync + briefs + digest (P5, repeatable).
  */
 import { asc, eq } from 'drizzle-orm';
 import type { Worker } from 'bullmq';
@@ -25,10 +25,6 @@ import { GraphMetaMediaClient } from './services/meta/media.client';
 import { GraphMetaSendClient } from './services/meta/send.client';
 import { PipelineService } from './services/pipeline.service';
 import { S3R2Client } from './services/r2.service';
-import { StructuringService } from './services/structuring.service';
-import { getDiarizationProvider } from './services/stt/diarization.provider';
-import { GroqWhisperProvider } from './services/stt/groqWhisper';
-import { TranscriptionService } from './services/transcription.service';
 import { WaSendService } from './services/waSend.service';
 import { createMediaWorker } from './workers/media.worker';
 import { createPlaudWorker } from './workers/plaud.worker';
@@ -37,8 +33,6 @@ import { createPlaudTokenProvider } from './services/plaud/plaud.auth';
 import { PlaudImportService } from './services/plaud/plaud.import.service';
 import { SpeakerResolver } from './services/plaud/speaker.resolver';
 import { createScheduledWorkers } from './workers/scheduled.worker';
-import { createStructuringWorker } from './workers/structuring.worker';
-import { createTranscriptionWorker } from './workers/transcription.worker';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -61,17 +55,6 @@ async function main(): Promise<void> {
     db,
     r2,
     meta: new GraphMetaMediaClient(config.META_ACCESS_TOKEN),
-    enqueuer,
-    pipeline,
-  });
-  const transcription = new TranscriptionService({
-    db,
-    stt: new GroqWhisperProvider(config.GROQ_API_KEY, undefined, undefined, {
-      language: config.STT_LANGUAGE,
-      prompt: config.STT_PROMPT,
-    }),
-    diarization: getDiarizationProvider(config.DIARIZATION),
-    diarizationMode: config.DIARIZATION,
     pipeline,
   });
   // ── Memory (Phase 6): embeddings + graph + retrieval + consolidation ────────
@@ -83,14 +66,6 @@ async function main(): Promise<void> {
     llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
     embeddings,
     graph,
-  });
-
-  const structuring = new StructuringService({
-    db,
-    llm: new DeepSeekClient(config.DEEPSEEK_API_KEY),
-    pipeline,
-    // Per-participant memory context for recommendations (docs/00 F4).
-    retrieval: (job) => retrieval.contextFor(job.tenantId, { includeSensitive: false }),
   });
 
   const calendar = new CalendarService({
@@ -176,8 +151,6 @@ async function main(): Promise<void> {
 
   const workers: Worker[] = [
     createMediaWorker({ connection, db, media }),
-    createTranscriptionWorker({ connection, db, r2, transcription, enqueuer }),
-    createStructuringWorker({ connection, db, structuring, pipeline }),
     ...plaudWorkers,
     ...(await createScheduledWorkers({
       connection,
@@ -190,7 +163,7 @@ async function main(): Promise<void> {
       plaudEnabled: plaudWorkers.length > 0,
     })),
   ];
-  console.log('[worker] booted — media, transcription, structuring, calendar-sync, briefs.');
+  console.log('[worker] booted — media, plaud-sync, calendar-sync, briefs, digest.');
 
   const shutdown = (signal: string): void => {
     console.log(`[worker] received ${signal}, shutting down.`);

@@ -12,7 +12,7 @@ import { entityKindSchema, relationTypeSchema } from './schemas/index';
 describe('shared vocabularies', () => {
   it('exposes every declared queue as a namespaced name', () => {
     expect(QUEUE_NAMES).toEqual(Object.values(QUEUES));
-    expect(QUEUES.transcription).toBe('recall-transcription');
+    expect(QUEUES.plaudSync).toBe('recall-plaud-sync');
     expect(QUEUE_NAMES.every((n) => n.startsWith('recall-'))).toBe(true);
   });
 

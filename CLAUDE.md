@@ -67,7 +67,7 @@ pnpm build            # all workspaces build clean
 ## Environment keys (registry in 01-ARCHITECTURE §8; never hardcode)
 
 DATABASE_URL, REDIS_URL, CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, R2_* (account, key, secret,
-bucket), GROQ_API_KEY, DEEPSEEK_API_KEY, EMBEDDINGS_API_KEY, EMBEDDINGS_URL,
+bucket), DEEPSEEK_API_KEY, EMBEDDINGS_API_KEY, EMBEDDINGS_URL, PLAUD_REFRESH_TOKEN,
 META_ACCESS_TOKEN, META_PHONE_NUMBER_ID, META_APP_SECRET, META_WEBHOOK_VERIFY_TOKEN,
 INTERNAL_API_KEY, APP_URL.
 
@@ -80,5 +80,6 @@ hard-delete path in the codebase.
 ## What NOT to build (out of scope — do not gold-plate)
 
 Gmail ingestion; voiceprint enrollment; native mobile apps; multi-workspace UI; billing;
-pyannote worker (scaffold the interface only — see 03 Phase 3); auto-booking without human
-confirmation (never).
+auto-booking without human confirmation (never); any Recall-side STT / diarization /
+meeting-note generation for meeting audio — **Plaud is the system of record for meeting
+capture (docs/05)**; Recall syncs transcripts + notes and owns only the graph across meetings.

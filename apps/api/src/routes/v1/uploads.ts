@@ -12,7 +12,6 @@ import { randomUUID } from 'node:crypto';
 import {
   presignRequestSchema,
   presignResponseSchema,
-  QUEUES,
   uploadCompleteRequestSchema,
   uploadCompleteResponseSchema,
 } from '@recall/shared';
@@ -21,7 +20,6 @@ import type { ZodType } from 'zod';
 
 import type { Database } from '../../db/client';
 import { events, mediaAssets } from '../../db/schema';
-import type { Enqueuer } from '../../queues';
 import type { PipelineService } from '../../services/pipeline.service';
 import type { R2Client } from '../../services/r2.service';
 
@@ -30,8 +28,7 @@ const PRESIGN_TTL_SEC = 15 * 60;
 export interface UploadRouteDeps {
   db: Database;
   r2: Pick<R2Client, 'presignPut'>;
-  enqueuer: Pick<Enqueuer, 'enqueue'>;
-  pipeline: Pick<PipelineService, 'startRun' | 'stage'>;
+  pipeline: Pick<PipelineService, 'startRun' | 'stage' | 'completeRun'>;
 }
 
 function parse<T>(schema: ZodType<T>, body: unknown): T {
@@ -91,12 +88,9 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRouteDeps
     });
     await deps.pipeline.stage(runId, 'ingested', async () => undefined);
     await deps.pipeline.stage(runId, 'media_stored', async () => undefined);
-    await deps.enqueuer.enqueue(QUEUES.transcription, 'transcription.run', {
-      tenantId,
-      eventId: event!.id,
-      mediaAssetId: asset!.id,
-      runId,
-    });
+    // Store-only: Plaud is the system of record for meeting capture, so uploaded audio is no
+    // longer transcribed here (docs/05 §2). Close the run at media_stored.
+    await deps.pipeline.completeRun(runId);
 
     return reply.code(201).send(
       uploadCompleteResponseSchema.parse({ eventId: event!.id, mediaAssetId: asset!.id }),

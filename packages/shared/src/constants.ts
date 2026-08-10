@@ -11,8 +11,6 @@
 // shared Redis. Keys stay the bare job kind; QueueName is the value union.
 export const QUEUES = {
   media: 'recall-media',
-  transcription: 'recall-transcription',
-  structuring: 'recall-structuring',
   consolidation: 'recall-consolidation',
   digest: 'recall-digest',
   briefs: 'recall-briefs',

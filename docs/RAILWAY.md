@@ -77,7 +77,6 @@ CLERK_SECRET_KEY=sk_live_...
 
 R2_ACCOUNT_ID=...  R2_ACCESS_KEY_ID=...  R2_SECRET_ACCESS_KEY=...  R2_BUCKET=recall-media
 
-GROQ_API_KEY=...          # Whisper STT
 DEEPSEEK_API_KEY=...      # structuring / consolidation / digest / brief
 EMBEDDINGS_API_KEY=...    # Cloudflare API token with Workers AI: Read
 EMBEDDINGS_URL=https://api.cloudflare.com/client/v4/accounts/<account id>/ai/run/@cf/baai/bge-m3
@@ -87,6 +86,11 @@ META_PHONE_NUMBER_ID=...
 META_APP_SECRET=...            # verifies X-Hub-Signature-256 on inbound webhooks
 META_WEBHOOK_VERIFY_TOKEN=...  # echoed on Meta's GET handshake
 WA_UTILITY_TEMPLATE=daily_brief_ready
+
+# Plaud meeting capture (docs/05). Only the refresh token is needed — public PKCE client, no
+# client id/secret. `plaud login` once on a machine with a browser, copy tokens.json refresh_token.
+PLAUD_SYNC_ENABLED=true
+PLAUD_REFRESH_TOKEN=...        # rotates; the worker persists the rotated token in Redis
 ```
 
 On **recall-web** set:
