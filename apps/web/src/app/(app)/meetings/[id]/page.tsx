@@ -2,6 +2,7 @@
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
+import { MeetingNotes } from '../../../../components/meetings/MeetingNotes';
 import { RecommendationCard } from '../../../../components/meetings/RecommendationCard';
 import { SpeakerChip } from '../../../../components/meetings/SpeakerChip';
 import { TopicScrubber } from '../../../../components/meetings/TopicScrubber';
@@ -62,15 +63,17 @@ export default function MeetingDetailPage() {
         </span>
       </div>
       <div className="detail-body">
-        <TopicScrubber
-          topics={meeting.topics}
-          totalMs={totalMs}
-          currentIndex={topicIdx}
-          onSelect={selectTopic}
-        />
+        {meeting.topics.length > 0 && (
+          <TopicScrubber
+            topics={meeting.topics}
+            totalMs={totalMs}
+            currentIndex={topicIdx}
+            onSelect={selectTopic}
+          />
+        )}
 
-        <h3 className="section-h">Summary</h3>
-        <p>{meeting.summary ?? '—'}</p>
+        <h3 className="section-h">Meeting notes</h3>
+        {meeting.summary ? <MeetingNotes markdown={meeting.summary} /> : <p style={{ color: 'var(--ink-3)' }}>—</p>}
 
         {meeting.decisions.length > 0 && (
           <>
