@@ -73,6 +73,10 @@ export class PlaudImportService {
       else if (outcome === 'stalled') result.stalled++;
       else if (outcome === 'advanced') result.advanced++;
     }
+
+    // Self-heal: meetings imported before action-item extraction existed have a summary but no
+    // tasks. Backfill from the stored summary (no Plaud call needed). createTasks is idempotent.
+    await this.backfillMeetingTasks(tenantId);
     return result;
   }
 
@@ -251,6 +255,17 @@ export class PlaudImportService {
     });
     await this.deps.pipeline.completeRun(runId);
     return 'imported';
+  }
+
+  /** Backfill tasks for meetings that predate action-item extraction. Idempotent per meeting. */
+  private async backfillMeetingTasks(tenantId: string): Promise<void> {
+    const rows = await this.deps.db
+      .select({ id: meetings.id, summary: meetings.summary })
+      .from(meetings)
+      .where(eq(meetings.tenantId, tenantId));
+    for (const m of rows) {
+      if (m.summary) await this.createTasks(tenantId, m.id, null, m.summary);
+    }
   }
 
   /** Create the operator-facing meeting row with resolved speakers + calendar link. */
