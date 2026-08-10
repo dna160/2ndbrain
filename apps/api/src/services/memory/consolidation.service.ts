@@ -44,10 +44,14 @@ export class ConsolidationService {
 
   async consolidate(tenantId: string): Promise<ConsolidationResult> {
     const since = new Date(this.now().getTime() - 24 * 3600 * 1000);
+    // Filter by createdAt (arrival), NOT occurredAt (event time). Plaud meeting events carry the
+    // recording's start_at as occurredAt — often days old — so filtering on occurredAt would drop
+    // freshly-imported meetings from consolidation. WA/calendar events have occurredAt ≈ createdAt,
+    // so this is a no-op for them. occurredAt is still passed to the LLM as the fact's timestamp.
     const dayEvents = await this.deps.db
       .select({ id: events.id, content: events.content, occurredAt: events.occurredAt })
       .from(events)
-      .where(and(eq(events.tenantId, tenantId), gte(events.occurredAt, since)));
+      .where(and(eq(events.tenantId, tenantId), gte(events.createdAt, since)));
     const roster = await this.deps.db
       .select({ id: entities.id, kind: entities.kind, name: entities.name })
       .from(entities)
