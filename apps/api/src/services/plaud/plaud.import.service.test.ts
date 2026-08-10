@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { events, meetings, plaudRecordings, transcripts } from '../../db/schema';
+import { events, meetings, plaudRecordings, tasks, transcripts } from '../../db/schema';
 import type { Database } from '../../db/client';
 import { PlaudImportService } from './plaud.import.service';
 import type { PlaudClient } from './plaud.client';
@@ -16,6 +16,7 @@ function fakeDb(cfg: {
   selects: { table: unknown; rows: unknown[] }[];
   inserts: { table: unknown; rows: unknown[] }[];
   onUpdate: (payload: Record<string, unknown>) => void;
+  onInsert?: (table: unknown, values: unknown) => void;
 }): Database {
   const selectQ = [...cfg.selects];
   const insertQ = [...cfg.inserts];
@@ -36,7 +37,12 @@ function fakeDb(cfg: {
     insert: (table: unknown) => {
       const idx = insertQ.findIndex((i) => i.table === table);
       const rows = idx >= 0 ? insertQ.splice(idx, 1)[0]!.rows : [];
-      return thenable(rows);
+      const q = thenable(rows) as Record<string, unknown>;
+      q.values = (v: unknown) => {
+        cfg.onInsert?.(table, v);
+        return q;
+      };
+      return q;
     },
     update: () => {
       const q: Record<string, unknown> = {};
@@ -127,6 +133,42 @@ describe('PlaudImportService state machine', () => {
     expect(ingested?.contentHash).toEqual(expect.any(String));
     expect(ingested?.eventId).toBe('ev1');
     expect(ingested?.transcriptId).toBe('tr1');
+  });
+
+  it('creates open tasks from the notes action items on import', async () => {
+    const withActions = {
+      ...READY,
+      note_list: [
+        {
+          data_type: 'auto_sum_note',
+          data_content: '## Next\n- [ ] Kirim daftar warna\n- [x] sudah beres\n- plain bullet',
+        },
+      ],
+    };
+    const inserted: { table: unknown; values: unknown }[] = [];
+    const db = fakeDb({
+      selects: [
+        { table: plaudRecordings, rows: [{ plaudId: 'p1', readiness: 'discovered' }] },
+        { table: plaudRecordings, rows: [{ readiness: 'discovered', contentHash: null }] },
+        { table: tasks, rows: [] }, // no existing tasks for the meeting
+      ],
+      inserts: [
+        { table: plaudRecordings, rows: [{ id: 'rec1' }] },
+        { table: events, rows: [{ id: 'ev1' }] },
+        { table: transcripts, rows: [{ id: 'tr1' }] },
+        { table: meetings, rows: [{ id: 'mt1' }] },
+      ],
+      onUpdate: () => {},
+      onInsert: (table, values) => inserted.push({ table, values }),
+    });
+    const svc = new PlaudImportService({ db, plaud: client(withActions), r2: r2(), pipeline: pipeline(), speakers: speakers(), stallHours: 48, now: () => new Date('2026-08-08T10:00:00Z') });
+    await svc.sync('t1');
+    const taskInsert = inserted.find((i) => i.table === tasks);
+    expect(taskInsert).toBeTruthy();
+    // Only the unchecked, non-placeholder item becomes an open task.
+    const rows = taskInsert!.values as Array<{ title: string; status: string; meetingId: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ title: 'Kirim daftar warna', status: 'open', meetingId: 'mt1' });
   });
 
   it('holds a not-ready recording at awaiting_transcript without importing', async () => {

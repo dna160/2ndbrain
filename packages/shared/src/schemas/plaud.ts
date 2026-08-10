@@ -107,3 +107,26 @@ export function plaudNotesMarkdown(detail: Pick<PlaudFileDetail, 'note_list'>): 
 export function plaudIsReady(detail: PlaudFileDetail): boolean {
   return plaudTranscriptSegments(detail).length > 0 && plaudNotesMarkdown(detail).length > 0;
 }
+
+export interface PlaudActionItem {
+  text: string;
+  done: boolean;
+}
+
+/**
+ * Extract action items from the notes markdown — the GFM task-list entries Plaud renders under
+ * "Pengaturan Selanjutnya" / "Next Steps" (`- [ ] …` / `- [x] …`). These become Recall tasks so
+ * they show up in Actions and the nightly digest. Placeholder rows like "[Masukkan lainnya]" /
+ * "[Add other]" are skipped. Inline markdown emphasis is stripped to plain text.
+ */
+export function plaudActionItems(notesMarkdown: string): PlaudActionItem[] {
+  const out: PlaudActionItem[] = [];
+  for (const raw of notesMarkdown.split('\n')) {
+    const m = /^\s*[-*+]\s+\[([ xX])\]\s+(.*\S)\s*$/.exec(raw);
+    if (!m) continue;
+    const text = (m[2] ?? '').replace(/[*_`]+/g, '').trim();
+    if (!text || /^\[.*\]$/.test(text)) continue; // skip empty + "[Masukkan lainnya]" placeholders
+    out.push({ text, done: m[1] !== ' ' });
+  }
+  return out;
+}

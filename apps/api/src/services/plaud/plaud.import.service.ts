@@ -15,13 +15,13 @@ import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db/client';
-import { events, meetings, plaudRecordings, transcripts, type TranscriptSegment } from '../../db/schema';
+import { events, meetings, plaudRecordings, tasks, transcripts, type TranscriptSegment } from '../../db/schema';
 import type { PlaudFileDetail } from '@recall/shared';
 import type { PipelineService } from '../pipeline.service';
 import type { R2Client } from '../r2.service';
 import { type PlaudClient, PlaudSchemaError, toTranscriptSegments } from './plaud.client';
 import { distinctSpeakers, type SpeakerResolver } from './speaker.resolver';
-import { plaudIsReady, plaudNotesMarkdown } from '@recall/shared';
+import { plaudActionItems, plaudIsReady, plaudNotesMarkdown } from '@recall/shared';
 
 export interface PlaudImportDeps {
   db: Database;
@@ -145,6 +145,7 @@ export class PlaudImportService {
         contentHash: plaudRecordings.contentHash,
         meetingId: plaudRecordings.meetingId,
         transcriptId: plaudRecordings.transcriptId,
+        eventId: plaudRecordings.eventId,
       })
       .from(plaudRecordings)
       .where(and(eq(plaudRecordings.tenantId, tenantId), eq(plaudRecordings.plaudId, plaudId)));
@@ -155,7 +156,14 @@ export class PlaudImportService {
       // just the meeting row is missing. Create it from the existing transcript — no re-import,
       // so no duplicate event/transcript. Self-heals the pre-3c imports.
       if (existing.transcriptId) {
-        const meetingId = await this.createMeeting(tenantId, detail, existing.transcriptId, segments, notes);
+        const meetingId = await this.createMeeting(
+          tenantId,
+          detail,
+          existing.transcriptId,
+          segments,
+          notes,
+          existing.eventId,
+        );
         await this.setState(tenantId, plaudId, { meetingId });
         return 'imported';
       }
@@ -226,7 +234,7 @@ export class PlaudImportService {
     // POST /v1/meetings/:id/participants/:speakerKey/confirm route.
     const meetingId = transcriptId
       ? await this.deps.pipeline.stage(runId, 'structured', () =>
-          this.createMeeting(tenantId, detail, transcriptId, segments, notes),
+          this.createMeeting(tenantId, detail, transcriptId, segments, notes, eventId),
         )
       : null;
 
@@ -252,6 +260,7 @@ export class PlaudImportService {
     transcriptId: string,
     segments: TranscriptSegment[],
     notes: string,
+    eventId: string | null,
   ): Promise<string | null> {
     const labels = distinctSpeakers(segments);
     const [participants, calendarEventId] = await Promise.all([
@@ -270,7 +279,40 @@ export class PlaudImportService {
         summary: notes,
       })
       .returning({ id: meetings.id });
-    return mRows[0]?.id ?? null;
+    const meetingId = mRows[0]?.id ?? null;
+    if (meetingId) await this.createTasks(tenantId, meetingId, eventId, notes);
+    return meetingId;
+  }
+
+  /**
+   * Turn the notes' action items into open tasks so they show up in Actions + the digest.
+   * Idempotent: skips if this meeting already has tasks (safe on backfill / re-import).
+   */
+  private async createTasks(
+    tenantId: string,
+    meetingId: string,
+    eventId: string | null,
+    notes: string,
+  ): Promise<void> {
+    const items = plaudActionItems(notes).filter((i) => !i.done);
+    if (items.length === 0) return;
+
+    const [existing] = await this.deps.db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(and(eq(tasks.tenantId, tenantId), eq(tasks.meetingId, meetingId)))
+      .limit(1);
+    if (existing) return;
+
+    await this.deps.db.insert(tasks).values(
+      items.map((i) => ({
+        tenantId,
+        title: i.text,
+        status: 'open' as const,
+        meetingId,
+        sourceEventId: eventId,
+      })),
+    );
   }
 
   private async setState(
