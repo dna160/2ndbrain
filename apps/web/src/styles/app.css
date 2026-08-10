@@ -530,3 +530,99 @@ a {
   background: var(--surface-2);
   font-weight: 600;
 }
+
+/* ── Today: grouped feed + "at a glance" dashboard ────────────────────────── */
+.group-h {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s3) var(--s4) var(--s1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.row-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font: inherit;
+}
+.glance-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--s3) var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--ink-3);
+}
+.stat-n {
+  font-size: var(--text-xl);
+  font-weight: 650;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.stat-l {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.glance-card {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.chip-warn {
+  background: #fbeaea;
+  color: #b02a2a;
+}
+:root[data-theme='dark'] .chip-warn,
+@media (prefers-color-scheme: dark) {
+  .chip-warn {
+    background: #3a1e1e;
+    color: #f0a3a3;
+  }
+}
+.glance-actions {
+  list-style: none;
+  padding: 0;
+  margin: var(--s2) 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.glance-actions li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  font-size: var(--text-md);
+  color: var(--ink);
+  border-bottom: 1px solid var(--border);
+}
+.glance-actions li:last-child {
+  border-bottom: none;
+}
+.glance-digest {
+  margin-top: var(--s5);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
