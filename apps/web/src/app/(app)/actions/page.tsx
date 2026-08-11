@@ -1,22 +1,55 @@
 'use client';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { MeetingNotes } from '../../../components/meetings/MeetingNotes';
-import { Tabs } from '../../../components/ui/primitives';
-import { useMeeting, usePatchTask, useTasks } from '../../../lib/queries';
-import { dateWIB } from '../../../lib/time';
+import { useMeeting, useMeetings, usePatchTask, useTasks } from '../../../lib/queries';
+import type { TaskListItem } from '@recall/shared';
 
-const TABS = ['Open', 'Done', 'All'] as const;
+const OTHER = '__other__';
 
-/** Source-meeting panel for a selected task (own component so useMeeting runs conditionally). */
-function TaskSource({ meetingId }: { meetingId: string }) {
+interface Group {
+  key: string;
+  meetingId: string | null;
+  title: string;
+  tasks: TaskListItem[];
+  open: number;
+  done: number;
+}
+
+/** Native checkbox with an indeterminate (partially-done) state. */
+function TriCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      aria-label={label}
+      ref={(el) => {
+        if (el) el.indeterminate = indeterminate;
+      }}
+      onChange={onChange}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
+
+/** Source-meeting panel for the selected group (own component so useMeeting runs conditionally). */
+function MeetingSource({ meetingId }: { meetingId: string }) {
   const router = useRouter();
   const { data: meeting, isLoading } = useMeeting(meetingId);
-
-  if (isLoading) return <div className="detail-body">Loading source…</div>;
-  if (!meeting) return <div className="empty">Source meeting not found.</div>;
-
+  if (isLoading) return <div className="detail-body">Loading meeting…</div>;
+  if (!meeting) return <div className="empty">Meeting not found.</div>;
   return (
     <>
       <div className="toolbar">
@@ -26,7 +59,7 @@ function TaskSource({ meetingId }: { meetingId: string }) {
         </button>
       </div>
       <div className="detail-body">
-        <h3 className="section-h">From this meeting</h3>
+        <h3 className="section-h">Meeting notes</h3>
         {meeting.summary ? (
           <MeetingNotes markdown={meeting.summary} />
         ) : (
@@ -39,66 +72,116 @@ function TaskSource({ meetingId }: { meetingId: string }) {
 
 export default function ActionsPage() {
   const { data: tasks = [] } = useTasks();
+  const { data: meetings = [] } = useMeetings();
   const patch = usePatchTask();
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Open');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
 
-  const filtered = tasks.filter((t) =>
-    tab === 'All' ? true : tab === 'Open' ? t.status === 'open' : t.status === 'done',
-  );
-  const selected = tasks.find((t) => t.id === selectedId) ?? null;
+  const groups = useMemo<Group[]>(() => {
+    const titleById = new Map(meetings.map((m) => [m.id, m.title]));
+    const byKey = new Map<string, TaskListItem[]>();
+    for (const t of tasks) {
+      const key = t.meetingId ?? OTHER;
+      const arr = byKey.get(key) ?? [];
+      arr.push(t);
+      byKey.set(key, arr);
+    }
+    return [...byKey.entries()]
+      .map(([key, ts]) => {
+        const open = ts.filter((t) => t.status === 'open').length;
+        return {
+          key,
+          meetingId: key === OTHER ? null : key,
+          title: key === OTHER ? 'Other actions' : titleById.get(key) ?? 'Untitled meeting',
+          tasks: ts,
+          open,
+          done: ts.length - open,
+        };
+      })
+      // Groups with open actions first, then alphabetical.
+      .sort((a, b) => (b.open > 0 ? 1 : 0) - (a.open > 0 ? 1 : 0) || a.title.localeCompare(b.title));
+  }, [tasks, meetings]);
+
+  const toggleExpand = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  // Clear a whole meeting: any open → mark all done; all done → reopen all.
+  const bulkToggle = (g: Group) => {
+    const target = g.open > 0 ? 'done' : 'open';
+    for (const t of g.tasks) {
+      if ((target === 'done' && t.status === 'open') || (target === 'open' && t.status === 'done')) {
+        patch.mutate({ id: t.id, status: target });
+      }
+    }
+  };
 
   return (
     <>
       <aside className="pane">
         <div className="list-header">
           <span className="list-title">Actions</span>
+          <span className="mono" style={{ color: 'var(--ink-3)', fontSize: 'var(--text-xs)' }}>
+            {groups.reduce((n, g) => n + g.open, 0)} open
+          </span>
         </div>
-        <Tabs tabs={TABS} value={tab} onChange={setTab} />
-        {filtered.length === 0 ? (
-          <div className="empty">No {tab.toLowerCase()} actions.</div>
+
+        {groups.length === 0 ? (
+          <div className="empty">No actions yet. They appear here from your meeting notes.</div>
         ) : (
-          filtered.map((t) => (
-            <div
-              key={t.id}
-              className="row"
-              aria-selected={t.id === selectedId}
-              style={{ display: 'flex', gap: 'var(--s3)', alignItems: 'center' }}
-            >
-              <input
-                type="checkbox"
-                checked={t.status === 'done'}
-                aria-label={`Mark "${t.title}" done`}
-                onChange={() => patch.mutate({ id: t.id, status: t.status === 'done' ? 'open' : 'done' })}
-              />
-              <button
-                type="button"
-                onClick={() => setSelectedId(t.id)}
-                style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0 }}
-              >
+          groups.map((g) => {
+            const isOpen = expanded.has(g.key);
+            return (
+              <div key={g.key} className="mgroup">
                 <div
-                  className="row-primary"
-                  style={{ textDecoration: t.status === 'done' ? 'line-through' : undefined }}
+                  className="mgroup-head"
+                  aria-selected={g.meetingId != null && g.meetingId === selectedMeetingId}
+                  onClick={() => {
+                    toggleExpand(g.key);
+                    setSelectedMeetingId(g.meetingId);
+                  }}
                 >
-                  {t.title}
+                  <TriCheckbox
+                    checked={g.open === 0}
+                    indeterminate={g.open > 0 && g.done > 0}
+                    onChange={() => bulkToggle(g)}
+                    label={`Clear all actions for ${g.title}`}
+                  />
+                  {isOpen ? <ChevronDown size={15} aria-hidden /> : <ChevronRight size={15} aria-hidden />}
+                  <span className="mgroup-title" style={{ textDecoration: g.open === 0 ? 'line-through' : undefined }}>
+                    {g.title}
+                  </span>
+                  <span className="mgroup-count">{g.open === 0 ? 'done' : `${g.open} open`}</span>
                 </div>
-                <div className="row-meta">
-                  {t.meetingId ? 'From a meeting' : 'No linked meeting'}
-                  {t.dueAt ? ` · ${dateWIB(t.dueAt)}` : ''}
-                </div>
-              </button>
-            </div>
-          ))
+
+                {isOpen &&
+                  g.tasks.map((t) => (
+                    <div key={t.id} className="action-item">
+                      <input
+                        type="checkbox"
+                        checked={t.status === 'done'}
+                        aria-label={`Mark "${t.title}" done`}
+                        onChange={() => patch.mutate({ id: t.id, status: t.status === 'done' ? 'open' : 'done' })}
+                      />
+                      <span style={{ textDecoration: t.status === 'done' ? 'line-through' : undefined }}>
+                        {t.title}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            );
+          })
         )}
       </aside>
 
       <section className="pane detail">
-        {!selected ? (
-          <div className="empty">Actions come from meeting notes — select one to see its source.</div>
-        ) : selected.meetingId ? (
-          <TaskSource meetingId={selected.meetingId} />
+        {selectedMeetingId ? (
+          <MeetingSource meetingId={selectedMeetingId} />
         ) : (
-          <div className="empty">This action isn’t linked to a meeting.</div>
+          <div className="empty">Select a meeting to see its notes. Check it off to clear its actions.</div>
         )}
       </section>
     </>
